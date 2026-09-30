@@ -1,0 +1,13 @@
+-- Pricing, supplier, delivery, payment and routing foundation.
+-- Live schema includes:
+-- markup_profiles: Residential, Property Management, Commercial, Emergency / After Hours
+-- tax_profiles: Ontario HST default 13%, extensible by country/region
+-- suppliers + supplier_products: Home Depot Canada starts as manual/import adapter
+-- job_stops: multiple supplier/pickup/customer stops
+-- quote_access_tokens: hashed, expiring/revocable customer approval-link tokens
+-- payment_requests: deposit/full-payment provider-neutral requests
+-- delivery_events: email/SMS sent/delivery events
+-- quote lifecycle: sent_at, viewed_at, customer_approved_at, approval_channel
+-- quote pricing: markup_profile_id + per-estimate markup_override
+-- line items: supplier product link, internal cost/margin, customer visibility
+-- jobs: tentative scheduling and geocode fields
