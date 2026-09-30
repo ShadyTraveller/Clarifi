@@ -19,7 +19,7 @@ export default function Home() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
-  const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
+  
 
   useEffect(() => {
     supabase.auth.getSession().then(({data}) => { setSession(data.session); if (data.session) loadData(); else setLoading(false); });
@@ -27,11 +27,11 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
   async function loadData(){ setLoading(true); const [{data:c},{data:j},{data:q},{data:i},{data:t}] = await Promise.all([supabase.from('clients').select('*').order('created_at',{ascending:false}),supabase.from('jobs').select('*, clients(*)').order('created_at',{ascending:false}),supabase.from('quotes').select('*').order('created_at',{ascending:false}),supabase.from('invoices').select('*').order('created_at',{ascending:false}),supabase.from('scope_templates').select('*').order('name')]); setClients(c||[]); setJobs(j||[]); setQuotes(q||[]); setInvoices(i||[]); setTemplates(t||[]); setLoading(false); }
-  async function authenticate(){ setAuthMessage(''); const r=authMode==='signin'?await supabase.auth.signInWithPassword({email:authEmail,password:authPassword}):await supabase.auth.signUp({email:authEmail,password:authPassword}); if(r.error)setAuthMessage(r.error.message); else if(authMode==='signup')setAuthMessage('Check your email to confirm your account, then sign in.'); }
+  async function authenticate(){ setAuthMessage(''); const r=await supabase.auth.signInWithPassword({email:authEmail,password:authPassword}); if(r.error)setAuthMessage(r.error.message); }
   async function createLead(){
     const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
     let {data:member}=await supabase.from('organization_members').select('organization_id').eq('user_id',user.id).limit(1).maybeSingle();
-    if(!member){await supabase.rpc('create_organization',{org_name:'Clarifi Workspace'}); member=(await supabase.from('organization_members').select('organization_id').eq('user_id',user.id).limit(1).single()).data;}
+    if(!member)return alert('Your account is not assigned to a Clarifi workspace. Contact an administrator.');
     if(!member)return alert('Workspace setup failed.');
     const q=(sel:string)=>(document.querySelector(sel) as HTMLInputElement)?.value||'';
     const relationship=clientType.toLowerCase().replaceAll(' ','_');
@@ -42,7 +42,7 @@ export default function Home() {
     setShowIntake(false); loadData();
   }
 
-  if (!session) return <main className="auth-shell"><div className="auth-card"><div className="brand auth-brand"><span className="brand-mark">C</span><span>clarifi</span></div><p className="eyebrow">PRIVATE WORKSPACE</p><h1>{authMode==='signin'?'Welcome back.':'Create your workspace.'}</h1><p className="auth-copy">Secure service operations for clients, technicians and office teams.</p><label>Email<input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="••••••••"/></label>{authMessage&&<p className="auth-message">{authMessage}</p>}<button className="primary wide" onClick={authenticate}>{authMode==='signin'?'Sign in':'Create account'}</button><button className="text-button" onClick={()=>setAuthMode(authMode==='signin'?'signup':'signin')}>{authMode==='signin'?'Create a new workspace':'Already have an account? Sign in'}</button></div></main>;
+  if (!session) return <main className="auth-shell"><div className="auth-card"><div className="brand auth-brand"><span className="brand-mark">C</span><span>clarifi</span></div><p className="eyebrow">PRIVATE WORKSPACE</p><h1>Welcome back.</h1><p className="auth-copy">Secure service operations for clients, technicians and office teams.</p><label>Email<input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="••••••••"/></label>{authMessage&&<p className="auth-message">{authMessage}</p>}<button className="primary wide" onClick={authenticate}>Sign in</button><p className="auth-message">Staff access only. Accounts are provisioned by Clarifi administration.</p></div></main>;
 
   return (
     <main className="shell">
