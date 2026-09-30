@@ -1,5 +1,11 @@
 # Clarifi MVP architecture
 
+## Delivery sequence
+
+1. Ship the mobile-friendly Next.js website first. Field mode provides Today / Quote / Scope / Photos, while Office mode preserves the operations workspace. All records remain in Supabase.
+2. Validate the field workflow on phones before resuming native builds.
+3. Introduce the Expo client using the existing PostgreSQL RPC contracts; do not duplicate pricing rules. The `mobile/` package is a future client, not the primary MVP release.
+
 ## Clients
 - **Back-office web:** current Next.js dashboard, responsive and optimized for dispatch/office workflows.
 - **Technician mobile:** React Native + Expo client. It should consume the same authenticated service contract rather than duplicate pricing logic.
