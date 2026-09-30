@@ -3,126 +3,48 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib_supabase';
 
-const statusClass: Record<string,string> = { lead:'lead', active:'active', estimate:'estimate', completed:'completed' };
+type View = 'dashboard'|'clients'|'leads'|'jobs'|'schedule'|'estimates'|'measurements'|'templates'|'invoices'|'team';
+const statusClass:Record<string,string>={lead:'lead',active:'active',estimate:'estimate',completed:'completed'};
 
-export default function Home() {
-  const [directory, setDirectory] = useState<'home'|'clients'|'techs'|'office'>('home');
-  const [showIntake, setShowIntake] = useState(false);
-  const [clientType, setClientType] = useState('Tenant');
-  const [session, setSession] = useState<any>(null);
-  const [clients, setClients] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authMessage, setAuthMessage] = useState('');
-  
+export default function Home(){
+ const [session,setSession]=useState<any>(null),[view,setView]=useState<View>('dashboard'),[loading,setLoading]=useState(true);
+ const [clients,setClients]=useState<any[]>([]),[jobs,setJobs]=useState<any[]>([]),[quotes,setQuotes]=useState<any[]>([]),[invoices,setInvoices]=useState<any[]>([]),[templates,setTemplates]=useState<any[]>([]),[measurements,setMeasurements]=useState<any[]>([]),[members,setMembers]=useState<any[]>([]);
+ const [orgId,setOrgId]=useState(''),[showIntake,setShowIntake]=useState(false),[clientType,setClientType]=useState('Tenant'),[authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authMessage,setAuthMessage]=useState('');
+ const [selectedJob,setSelectedJob]=useState(''),[itemName,setItemName]=useState('Labour & materials'),[qty,setQty]=useState('1'),[unitPrice,setUnitPrice]=useState('0'),[taxRate,setTaxRate]=useState('13'),[notice,setNotice]=useState('');
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({data}) => { setSession(data.session); if (data.session) loadData(); else setLoading(false); });
-    const {data:{subscription}} = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); if (next) loadData(); });
-    return () => subscription.unsubscribe();
-  }, []);
-  async function loadData(){ setLoading(true); const [{data:c},{data:j},{data:q},{data:i},{data:t}] = await Promise.all([supabase.from('clients').select('*').order('created_at',{ascending:false}),supabase.from('jobs').select('*, clients(*)').order('created_at',{ascending:false}),supabase.from('quotes').select('*').order('created_at',{ascending:false}),supabase.from('invoices').select('*').order('created_at',{ascending:false}),supabase.from('scope_templates').select('*').order('name')]); setClients(c||[]); setJobs(j||[]); setQuotes(q||[]); setInvoices(i||[]); setTemplates(t||[]); setLoading(false); }
-  async function authenticate(){ setAuthMessage(''); const r=await supabase.auth.signInWithPassword({email:authEmail,password:authPassword}); if(r.error)setAuthMessage(r.error.message); }
-  async function createLead(){
-    const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
-    let {data:member}=await supabase.from('organization_members').select('organization_id').eq('user_id',user.id).limit(1).maybeSingle();
-    if(!member)return alert('Your account is not assigned to a Clarifi workspace. Contact an administrator.');
-    if(!member)return alert('Workspace setup failed.');
-    const q=(sel:string)=>(document.querySelector(sel) as HTMLInputElement)?.value||'';
-    const relationship=clientType.toLowerCase().replaceAll(' ','_');
-    const {data:client,error}=await supabase.from('clients').insert({organization_id:member.organization_id,name:q('input[placeholder="Full name or company"]'),email:q('input[type="email"]')||null,phone:q('input[placeholder="(416) 555-0123"]')||null,address:q('input[placeholder="Street, city, postal code"]')||null,relationship}).select().single();
-    if(error)return alert(error.message);
-    const request=q('input[placeholder="What does the client need?"]')||'General service request'; const details=(document.querySelector('textarea') as HTMLTextAreaElement)?.value||null;
-    const {error:je}=await supabase.from('jobs').insert({organization_id:member.organization_id,client_id:client.id,request,details,status:'lead'}); if(je)return alert(je.message);
-    setShowIntake(false); loadData();
-  }
+ useEffect(()=>{supabase.auth.getSession().then(({data})=>{setSession(data.session);if(data.session)loadData();else setLoading(false)});const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>{setSession(s);if(s)loadData()});return()=>subscription.unsubscribe()},[]);
+ async function membership(){const {data:{user}}=await supabase.auth.getUser();if(!user)return null;const {data}=await supabase.from('organization_members').select('organization_id,role').eq('user_id',user.id).limit(1).maybeSingle();return data}
+ async function loadData(){setLoading(true);const m=await membership();if(!m){setLoading(false);return}setOrgId(m.organization_id);const [c,j,q,i,t,me,mb]=await Promise.all([
+  supabase.from('clients').select('*').order('created_at',{ascending:false}),supabase.from('jobs').select('*,clients(*)').order('created_at',{ascending:false}),supabase.from('quotes').select('*').order('created_at',{ascending:false}),supabase.from('invoices').select('*').order('created_at',{ascending:false}),supabase.from('scope_templates').select('*').order('name'),supabase.from('job_measurements').select('*').order('created_at',{ascending:false}),supabase.from('organization_members').select('*').order('created_at')
+ ]);setClients(c.data||[]);setJobs(j.data||[]);setQuotes(q.data||[]);setInvoices(i.data||[]);setTemplates(t.data||[]);setMeasurements(me.data||[]);setMembers(mb.data||[]);setLoading(false)}
+ async function authenticate(){setAuthMessage('');const r=await supabase.auth.signInWithPassword({email:authEmail,password:authPassword});if(r.error)setAuthMessage(r.error.message)}
+ async function createLead(){const m=await membership();if(!m)return alert('No Clarifi workspace assigned.');const q=(s:string)=>(document.querySelector(s) as HTMLInputElement)?.value||'';const rel=clientType.toLowerCase().replaceAll(' ','_');const {data:client,error}=await supabase.from('clients').insert({organization_id:m.organization_id,name:q('#client-name'),email:q('#client-email')||null,phone:q('#client-phone')||null,address:q('#client-address')||null,relationship:rel}).select().single();if(error)return alert(error.message);const {error:je}=await supabase.from('jobs').insert({organization_id:m.organization_id,client_id:client.id,request:q('#client-request')||'General service request',details:q('#client-details')||null,status:'lead'});if(je)return alert(je.message);setShowIntake(false);await loadData()}
+ async function updateJob(id:string,patch:any){const {error}=await supabase.from('jobs').update({...patch,updated_at:new Date().toISOString()}).eq('id',id);if(error)return alert(error.message);await loadData()}
+ async function createEstimate(){if(!selectedJob)return setNotice('Select a job first.');const job=jobs.find(x=>x.id===selectedJob);const subtotal=Number(qty)*Number(unitPrice),tax=subtotal*(Number(taxRate)/100),total=subtotal+tax;const num='Q-'+Date.now().toString().slice(-7);const {data:qrow,error}=await supabase.from('quotes').insert({organization_id:orgId,job_id:selectedJob,quote_number:num,status:'draft'}).select().single();if(error)return setNotice(error.message);const {data:v,error:ve}=await supabase.from('quote_versions').insert({quote_id:qrow.id,version_number:1,subtotal,tax,total,created_by:session.user.id}).select().single();if(ve)return setNotice(ve.message);const {error:le}=await supabase.from('quote_line_items').insert({quote_version_id:v.id,item_name:itemName,quantity:Number(qty),unit:'each',unit_cost:Number(unitPrice),markup_percent:0,unit_price:Number(unitPrice),total:subtotal});if(le)return setNotice(le.message);await updateJob(selectedJob,{status:'estimate'});setNotice(`${num} created for ${job?.clients?.name||'client'}.`);await loadData()}
+ async function approveEstimate(id:string,jobId:string){const {error}=await supabase.from('quotes').update({status:'approved',approved_at:new Date().toISOString(),approved_by:session.user.id}).eq('id',id);if(error)return alert(error.message);await updateJob(jobId,{status:'active'});await loadData()}
+ async function addMeasurement(){if(!selectedJob)return setNotice('Select a job first.');const label=(document.querySelector('#measure-label') as HTMLInputElement)?.value||'';const value=(document.querySelector('#measure-value') as HTMLInputElement)?.value||'';const unit=(document.querySelector('#measure-unit') as HTMLInputElement)?.value||'';if(!label)return setNotice('Measurement label is required.');const {error}=await supabase.from('job_measurements').insert({organization_id:orgId,job_id:selectedJob,label,value:value?Number(value):null,unit:unit||null,created_by:session.user.id});if(error)return setNotice(error.message);setNotice('Measurement saved.');await loadData()}
+ async function createInvoice(job:any){const related=quotes.filter(q=>q.job_id===job.id&&q.status==='approved');let total=0;if(related.length){const {data:v}=await supabase.from('quote_versions').select('total').eq('quote_id',related[0].id).order('version_number',{ascending:false}).limit(1).maybeSingle();total=Number(v?.total||0)}const tax=total?total-(total/1.13):0,subtotal=total-tax;const {error}=await supabase.from('invoices').insert({organization_id:orgId,job_id:job.id,client_id:job.client_id,invoice_number:'INV-'+Date.now().toString().slice(-7),status:'draft',subtotal,tax,total,notes:job.request});if(error)return alert(error.message);await loadData()}
+ const jobName=(id:string)=>{const j=jobs.find(x=>x.id===id);return j?`${j.clients?.name||'Client'} — ${j.request}`:'Job'};
+ if(!session)return <main className="auth-shell"><div className="auth-card"><div className="brand auth-brand"><span className="brand-mark">C</span><span>clarifi</span></div><p className="eyebrow">PRIVATE WORKSPACE</p><h1>Welcome back.</h1><p className="auth-copy">Staff-only service operations.</p><label>Email<input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/></label><label>Password<input type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></label>{authMessage&&<p className="auth-message">{authMessage}</p>}<button className="primary wide" onClick={authenticate}>Sign in</button><p className="auth-message">Accounts are provisioned by Clarifi administration.</p></div></main>;
 
-  if (!session) return <main className="auth-shell"><div className="auth-card"><div className="brand auth-brand"><span className="brand-mark">C</span><span>clarifi</span></div><p className="eyebrow">PRIVATE WORKSPACE</p><h1>Welcome back.</h1><p className="auth-copy">Secure service operations for clients, technicians and office teams.</p><label>Email<input type="email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="••••••••"/></label>{authMessage&&<p className="auth-message">{authMessage}</p>}<button className="primary wide" onClick={authenticate}>Sign in</button><p className="auth-message">Staff access only. Accounts are provisioned by Clarifi administration.</p></div></main>;
-
-  return (
-    <main className="shell">
-      <header className="topbar">
-        <button className="brand" onClick={() => setDirectory('home')} aria-label="Clarifi home">
-          <span className="brand-mark">C</span><span>clarifi</span>
-        </button>
-        <div className="top-actions">
-          <span className="secure"><i /> Admin · Owner</span>
-          <button className="avatar" onClick={()=>supabase.auth.signOut()} title="Sign out">A</button>
-        </div>
-      </header>
-
-      {directory === 'home' && (
-        <>
-          <section className="hero">
-            <div className="hero-copy">
-              <p className="eyebrow">SERVICE OPERATIONS</p>
-              <h1>Clear work.<br/><em>Clear quotes.</em></h1>
-              <p className="lede">One workspace for clients, technicians and office teams — from the first request to the approved estimate and completed job.</p>
-              <button className="primary" onClick={() => setShowIntake(true)}>+ New client / request</button>
-            </div>
-            <div className="hero-card">
-              <div className="mini-head"><span>Admin overview</span><span>{new Date().toLocaleDateString()}</span></div>
-              <div className="metric-row"><div><strong>{clients.length}</strong><span>Clients</span></div><div><strong>{jobs.length}</strong><span>Jobs</span></div><div><strong>{quotes.length}</strong><span>Quotes</span></div></div>
-              <div className="progress"><span style={{width:'68%'}} /></div>
-              <p className="small-note">{loading ? 'Loading live workspace…' : `${jobs.filter((j:any)=>j.status==='lead').length} leads · ${templates.length} templates · ${invoices.length} invoices`}</p>
-            </div>
-          </section>
-
-          <section className="workspace-preview"><div className="section-label"><span>ADMIN MVP</span><span>Operations</span></div><div className="module-grid"><Module title="Leads" text="Requests that need scope or site information." /><Module title="Jobs" text="Active work, assignments and field progress." /><Module title="Schedule & Dispatch" text="Appointments and technician assignments." /><Module title="Estimates" text="Standardized scope-first estimates and pricing." /><Module title="Scope & Measurements" text="Field dimensions, specifications and site notes." /><Module title="Quote Templates" text="Reusable locksmith, glazing and security-film scopes." /><Module title="Quotes & Approvals" text="Versioned quotes, signatures and approvals." /><Module title="Files & Photos" text="Site photos, documents and deliverables." /><Module title="Messages" text="Client and job communication." /><Module title="Technicians" text="Team roles and field access." /><Module title="Invoices" text="Draft, issued, due and paid invoices." /><Module title="Activity" text="Operational job events and audit history." /><Module title="Settings & Team" text="Workspace membership and organization settings." /></div></section><section className="directory">
-            <div className="section-label"><span>WORKSPACE</span><span>Choose your view</span></div>
-            <div className="directory-grid">
-              <button onClick={() => setDirectory('clients')} className="directory-card">
-                <span className="card-number">01</span><div><h2>Clients</h2><p>Requests, projects, files and estimate history.</p></div><span className="arrow">↗</span>
-              </button>
-              <button onClick={() => setDirectory('techs')} className="directory-card dark">
-                <span className="card-number">02</span><div><h2>Techs</h2><p>Jobs, measurements, scope templates and field notes.</p></div><span className="arrow">↗</span>
-              </button>
-              <button onClick={() => setDirectory('office')} className="directory-card">
-                <span className="card-number">03</span><div><h2>Office</h2><p>Dispatch, schedules, estimates, invoices and client communication.</p></div><span className="arrow">↗</span>
-              </button>
-            </div>
-          </section>
-
-          <section className="workspace-preview">
-            <div className="section-label"><span>ACTIVE WORK</span><span>Operational overview</span></div>
-            <div className="client-table">
-              <div className="table-head"><span>Client / request</span><span>Type</span><span>Status</span><span>Location</span></div>
-              {jobs.map((j:any) => <div className="table-row" key={j.id}><div><strong>{j.clients?.name||'Client'}</strong><small>{j.request}</small></div><span>{(j.clients?.relationship||'—').replaceAll('_',' ')}</span><span className={`pill ${statusClass[j.status]||'lead'}`}>{j.status}</span><span>{j.clients?.address||'—'}</span></div>)}
-            </div>
-          </section>
-        </>
-      )}
-
-      {directory !== 'home' && (
-        <section className="view">
-          <button className="back" onClick={() => setDirectory('home')}>← Workspace</button>
-          <div className="view-heading"><div><p className="eyebrow">{directory.toUpperCase()}</p><h1>{directory === 'clients' ? 'Clients' : directory === 'techs' ? 'Field workspace' : 'Office workspace'}</h1></div><button className="primary" onClick={() => setShowIntake(true)}>+ New client / request</button></div>
-          {directory === 'clients' && <div className="client-table"><div className="table-head"><span>Client / request</span><span>Type</span><span>Status</span><span>Location</span></div>{jobs.map((j:any) => <div className="table-row" key={j.id}><div><strong>{j.clients?.name||'Client'}</strong><small>{j.request}</small></div><span>{(j.clients?.relationship||'—').replaceAll('_',' ')}</span><span className={`pill ${statusClass[j.status]||'lead'}`}>{j.status}</span><span>{j.clients?.address||'—'}</span></div>)}</div>}
-          {directory === 'techs' && <div className="module-grid"><Module title="Jobs" text="Assigned service calls, site details and field notes." /><Module title="Estimates" text="Template selector and scope / measurement forms." /><Module title="Schedule" text="Today's route and upcoming appointments." /><Module title="Clients" text="Customer history, files and open requests." /></div>}
-          {directory === 'office' && <div className="module-grid"><Module title="Clients" text="Active accounts, notes, files and communication." /><Module title="Estimates" text="Standardized scope-first estimates awaiting review." /><Module title="Schedule & Dispatch" text="Assign jobs, coordinate technicians and track progress." /><Module title="Invoices" text="Turn completed jobs into customer-ready invoices." /></div>}
-        </section>
-      )}
-
-      {showIntake && <div className="modal-backdrop" onMouseDown={(e) => {if(e.target===e.currentTarget)setShowIntake(false)}}><div className="modal">
-        <div className="modal-top"><div><p className="eyebrow">NEW REQUEST</p><h2>Start with the client.</h2></div><button className="close" onClick={() => setShowIntake(false)}>×</button></div>
-        <p className="modal-intro">Give Clarifi enough context to build a standardized estimate — or create a lead when more information is needed.</p>
-        <div className="form-grid">
-          <label>Client name<input placeholder="Full name or company" /></label><label>Email<input type="email" placeholder="name@example.com" /></label>
-          <label>Phone number<input placeholder="(416) 555-0123" /></label><label>Property address<input placeholder="Street, city, postal code" /></label>
-          <label>Client relationship<select value={clientType} onChange={e=>setClientType(e.target.value)}><option>Tenant</option><option>Landlord</option><option>Property Management</option><option>Commercial</option><option>Other</option></select></label>
-          <label>Request / service<input placeholder="What does the client need?" /></label>
-        </div>
-        <label className="full">Details<textarea placeholder="Describe the issue, desired work, measurements or anything already known." /></label>
-        <div className="upload"><span>＋</span><div><strong>Add photos or files</strong><small>Site photos, measurements, documents or reference material</small></div><button>Choose files</button></div>
-        <div className="modal-actions"><button className="secondary" onClick={()=>setShowIntake(false)}>Cancel</button><button className="primary" onClick={createLead}>Create lead & review</button></div>
-      </div></div>}
-    </main>
-  );
+ const Nav=()=> <nav className="app-nav">{(['dashboard','clients','leads','jobs','schedule','estimates','measurements','templates','invoices','team'] as View[]).map(v=><button key={v} className={view===v?'nav-active':''} onClick={()=>setView(v)}>{v==='measurements'?'Scope':v[0].toUpperCase()+v.slice(1)}</button>)}</nav>;
+ return <main className="shell"><header className="topbar"><button className="brand" onClick={()=>setView('dashboard')}><span className="brand-mark">C</span><span>clarifi</span></button><div className="top-actions"><span className="secure"><i/> Admin · Owner</span><button className="avatar" onClick={()=>supabase.auth.signOut()}>A</button></div></header><Nav/>
+ <section className="view admin-view">
+  {view==='dashboard'&&<><div className="view-heading"><div><p className="eyebrow">ADMIN DASHBOARD</p><h1>Operations</h1></div><button className="primary" onClick={()=>setShowIntake(true)}>+ New client / request</button></div><div className="stat-grid"><Stat n={clients.length} label="Clients"/><Stat n={jobs.filter(j=>j.status==='lead').length} label="Leads"/><Stat n={jobs.filter(j=>j.status==='active').length} label="Active jobs"/><Stat n={quotes.length} label="Estimates"/><Stat n={invoices.length} label="Invoices"/></div><h2 className="subhead">Recent work</h2><JobTable jobs={jobs.slice(0,8)} updateJob={updateJob}/></>}
+  {view==='clients'&&<><Head title="Clients" action={()=>setShowIntake(true)}/><div className="client-table"><div className="table-head"><span>Client</span><span>Type</span><span>Contact</span><span>Location</span></div>{clients.map(c=><div className="table-row" key={c.id}><div><strong>{c.name}</strong><small>{jobs.filter(j=>j.client_id===c.id).length} requests</small></div><span>{c.relationship.replaceAll('_',' ')}</span><span>{c.phone||c.email||'—'}</span><span>{c.address||'—'}</span></div>)}</div></>}
+  {view==='leads'&&<><Head title="Leads"/><JobTable jobs={jobs.filter(j=>j.status==='lead')} updateJob={updateJob}/></>}
+  {view==='jobs'&&<><Head title="Jobs"/><JobTable jobs={jobs.filter(j=>j.status!=='lead')} updateJob={updateJob}/></>}
+  {view==='schedule'&&<><Head title="Schedule & dispatch"/><div className="client-table"><div className="table-head"><span>Job</span><span>Status</span><span>Start</span><span>Actions</span></div>{jobs.map(j=><div className="table-row" key={j.id}><div><strong>{j.clients?.name}</strong><small>{j.request}</small></div><span className={'pill '+(statusClass[j.status]||'lead')}>{j.status}</span><input className="inline-input" type="datetime-local" defaultValue={j.scheduled_start?new Date(j.scheduled_start).toISOString().slice(0,16):''} onBlur={e=>e.target.value&&updateJob(j.id,{scheduled_start:new Date(e.target.value).toISOString()})}/><button className="secondary compact" onClick={()=>updateJob(j.id,{status:'active'})}>Dispatch</button></div>)}</div></>}
+  {view==='estimates'&&<><Head title="Estimates"/><div className="work-card"><h3>Create estimate</h3><select value={selectedJob} onChange={e=>setSelectedJob(e.target.value)}><option value="">Select job</option>{jobs.map(j=><option key={j.id} value={j.id}>{jobName(j.id)}</option>)}</select><div className="form-row"><input value={itemName} onChange={e=>setItemName(e.target.value)} placeholder="Line item"/><input value={qty} onChange={e=>setQty(e.target.value)} type="number" placeholder="Qty"/><input value={unitPrice} onChange={e=>setUnitPrice(e.target.value)} type="number" placeholder="Unit price"/><input value={taxRate} onChange={e=>setTaxRate(e.target.value)} type="number" placeholder="Tax %"/><button className="primary" onClick={createEstimate}>Create draft</button></div>{notice&&<p className="auth-message">{notice}</p>}</div><div className="client-table"><div className="table-head"><span>Estimate</span><span>Job</span><span>Status</span><span>Action</span></div>{quotes.map(q=><div className="table-row" key={q.id}><strong>{q.quote_number}</strong><span>{jobName(q.job_id)}</span><span className="pill estimate">{q.status}</span>{q.status==='approved'?<span>Approved internally</span>:<button className="secondary compact" onClick={()=>approveEstimate(q.id,q.job_id)}>Mark approved</button>}</div>)}</div></>}
+  {view==='measurements'&&<><Head title="Scope & measurements"/><div className="work-card"><select value={selectedJob} onChange={e=>setSelectedJob(e.target.value)}><option value="">Select job</option>{jobs.map(j=><option key={j.id} value={j.id}>{jobName(j.id)}</option>)}</select><div className="form-row"><input id="measure-label" placeholder="Width / Height / Glass type"/><input id="measure-value" type="number" placeholder="Value"/><input id="measure-unit" placeholder="in / ft / mm"/><button className="primary" onClick={addMeasurement}>Save measurement</button></div>{notice&&<p className="auth-message">{notice}</p>}</div><div className="client-table"><div className="table-head"><span>Job</span><span>Measurement</span><span>Value</span><span>Notes</span></div>{measurements.map(m=><div className="table-row" key={m.id}><span>{jobName(m.job_id)}</span><strong>{m.label}</strong><span>{m.value??'—'} {m.unit||''}</span><span>{m.notes||'—'}</span></div>)}</div></>}
+  {view==='templates'&&<><Head title="Quote templates"/><div className="module-grid">{templates.map(t=><div className="module" key={t.id}><span className="eyebrow">{t.trade}</span><h3>{t.name}</h3><p>{t.description}</p></div>)}</div></>}
+  {view==='invoices'&&<><Head title="Invoices"/><div className="work-card"><h3>Create from job</h3><div className="button-wrap">{jobs.filter(j=>j.status==='active'||j.status==='completed').map(j=><button className="secondary" key={j.id} onClick={()=>createInvoice(j)}>+ {j.clients?.name} · {j.request}</button>)}</div></div><div className="client-table"><div className="table-head"><span>Invoice</span><span>Job</span><span>Status</span><span>Total</span></div>{invoices.map(i=><div className="table-row" key={i.id}><strong>{i.invoice_number}</strong><span>{jobName(i.job_id)}</span><span className="pill active">{i.status}</span><span>${Number(i.total).toFixed(2)}</span></div>)}</div></>}
+  {view==='team'&&<><Head title="Team & settings"/><div className="module-grid"><div className="module"><span className="eyebrow">WORKSPACE</span><h3>Clarifi Workspace</h3><p>{members.length} staff member{members.length===1?'':'s'} · authenticated access only.</p></div><div className="module"><span className="eyebrow">SECURITY</span><h3>Internal only</h3><p>No public signup, anonymous customer portal or public quote approval.</p></div></div></>}
+ </section>
+ {showIntake&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setShowIntake(false)}}><div className="modal"><div className="modal-top"><div><p className="eyebrow">NEW REQUEST</p><h2>Start with the client.</h2></div><button className="close" onClick={()=>setShowIntake(false)}>×</button></div><div className="form-grid"><label>Client name<input id="client-name" placeholder="Full name or company"/></label><label>Email<input id="client-email" type="email"/></label><label>Phone<input id="client-phone"/></label><label>Property address<input id="client-address"/></label><label>Relationship<select value={clientType} onChange={e=>setClientType(e.target.value)}><option>Tenant</option><option>Landlord</option><option>Property Management</option><option>Commercial</option><option>Other</option></select></label><label>Request<input id="client-request"/></label></div><label className="full">Details<textarea id="client-details"/></label><div className="modal-actions"><button className="secondary" onClick={()=>setShowIntake(false)}>Cancel</button><button className="primary" onClick={createLead}>Create lead</button></div></div></div>}
+ </main>
 }
 
-function Module({title,text}:{title:string,text:string}) { return <div className="module"><span className="module-icon">+</span><h3>{title}</h3><p>{text}</p><span className="module-arrow">↗</span></div> }
+function Head({title,action}:{title:string,action?:()=>void}){return <div className="view-heading"><div><p className="eyebrow">CLARIFI MVP</p><h1>{title}</h1></div>{action&&<button className="primary" onClick={action}>+ New client / request</button>}</div>}
+function Stat({n,label}:{n:number,label:string}){return <div className="stat"><strong>{n}</strong><span>{label}</span></div>}
+function JobTable({jobs,updateJob}:{jobs:any[],updateJob:(id:string,p:any)=>void}){return <div className="client-table"><div className="table-head"><span>Client / request</span><span>Type</span><span>Status</span><span>Action</span></div>{jobs.length===0?<div className="empty">No records yet.</div>:jobs.map(j=><div className="table-row" key={j.id}><div><strong>{j.clients?.name||'Client'}</strong><small>{j.request}</small></div><span>{(j.clients?.relationship||'—').replaceAll('_',' ')}</span><span className={'pill '+(statusClass[j.status]||'lead')}>{j.status}</span><select className="inline-input" value={j.status} onChange={e=>updateJob(j.id,{status:e.target.value})}><option value="lead">Lead</option><option value="estimate">Estimate</option><option value="active">Active</option><option value="completed">Completed</option></select></div>)}</div>}
