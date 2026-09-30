@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib_supabase';
 
-const statusClass: Record<string,string> = { Lead:'lead', Active:'active', Estimate:'estimate', Completed:'completed' };
+const statusClass: Record<string,string> = { lead:'lead', active:'active', estimate:'estimate', completed:'completed' };
 
 export default function Home() {
   const [directory, setDirectory] = useState<'home'|'clients'|'techs'|'office'>('home');
@@ -12,6 +12,9 @@ export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -23,7 +26,7 @@ export default function Home() {
     const {data:{subscription}} = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); if (next) loadData(); });
     return () => subscription.unsubscribe();
   }, []);
-  async function loadData(){ setLoading(true); const [{data:c},{data:j}] = await Promise.all([supabase.from('clients').select('*').order('created_at',{ascending:false}),supabase.from('jobs').select('*, clients(*)').order('created_at',{ascending:false})]); setClients(c||[]); setJobs(j||[]); setLoading(false); }
+  async function loadData(){ setLoading(true); const [{data:c},{data:j},{data:q},{data:i},{data:t}] = await Promise.all([supabase.from('clients').select('*').order('created_at',{ascending:false}),supabase.from('jobs').select('*, clients(*)').order('created_at',{ascending:false}),supabase.from('quotes').select('*').order('created_at',{ascending:false}),supabase.from('invoices').select('*').order('created_at',{ascending:false}),supabase.from('scope_templates').select('*').order('name')]); setClients(c||[]); setJobs(j||[]); setQuotes(q||[]); setInvoices(i||[]); setTemplates(t||[]); setLoading(false); }
   async function authenticate(){ setAuthMessage(''); const r=authMode==='signin'?await supabase.auth.signInWithPassword({email:authEmail,password:authPassword}):await supabase.auth.signUp({email:authEmail,password:authPassword}); if(r.error)setAuthMessage(r.error.message); else if(authMode==='signup')setAuthMessage('Check your email to confirm your account, then sign in.'); }
   async function createLead(){
     const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
@@ -48,8 +51,8 @@ export default function Home() {
           <span className="brand-mark">C</span><span>clarifi</span>
         </button>
         <div className="top-actions">
-          <span className="secure"><i /> Private workspace</span>
-          <button className="avatar">L</button>
+          <span className="secure"><i /> Admin · Owner</span>
+          <button className="avatar" onClick={()=>supabase.auth.signOut()} title="Sign out">A</button>
         </div>
       </header>
 
@@ -63,14 +66,14 @@ export default function Home() {
               <button className="primary" onClick={() => setShowIntake(true)}>+ New client / request</button>
             </div>
             <div className="hero-card">
-              <div className="mini-head"><span>Today</span><span>Monday, Sep 28</span></div>
-              <div className="metric-row"><div><strong>{clients.length}</strong><span>Clients</span></div><div><strong>{jobs.filter((j:any)=>j.status==='estimate').length}</strong><span>Estimates</span></div></div>
+              <div className="mini-head"><span>Admin overview</span><span>{new Date().toLocaleDateString()}</span></div>
+              <div className="metric-row"><div><strong>{clients.length}</strong><span>Clients</span></div><div><strong>{jobs.length}</strong><span>Jobs</span></div><div><strong>{quotes.length}</strong><span>Quotes</span></div></div>
               <div className="progress"><span style={{width:'68%'}} /></div>
-              <p className="small-note">{loading ? 'Loading live workspace…' : `${jobs.length} projects connected to Supabase.`}</p>
+              <p className="small-note">{loading ? 'Loading live workspace…' : `${jobs.filter((j:any)=>j.status==='lead').length} leads · ${templates.length} templates · ${invoices.length} invoices`}</p>
             </div>
           </section>
 
-          <section className="directory">
+          <section className="workspace-preview"><div className="section-label"><span>ADMIN MVP</span><span>Operations</span></div><div className="module-grid"><Module title="Leads" text="Requests that need scope or site information." /><Module title="Jobs" text="Active work, assignments and field progress." /><Module title="Schedule & Dispatch" text="Appointments and technician assignments." /><Module title="Estimates" text="Standardized scope-first estimates and pricing." /><Module title="Scope & Measurements" text="Field dimensions, specifications and site notes." /><Module title="Quote Templates" text="Reusable locksmith, glazing and security-film scopes." /><Module title="Quotes & Approvals" text="Versioned quotes, signatures and approvals." /><Module title="Files & Photos" text="Site photos, documents and deliverables." /><Module title="Messages" text="Client and job communication." /><Module title="Technicians" text="Team roles and field access." /><Module title="Invoices" text="Draft, issued, due and paid invoices." /><Module title="Activity" text="Operational job events and audit history." /><Module title="Settings & Team" text="Workspace membership and organization settings." /></div></section><section className="directory">
             <div className="section-label"><span>WORKSPACE</span><span>Choose your view</span></div>
             <div className="directory-grid">
               <button onClick={() => setDirectory('clients')} className="directory-card">
