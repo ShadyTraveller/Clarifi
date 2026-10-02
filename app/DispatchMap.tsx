@@ -10,7 +10,7 @@ export default function DispatchMap({jobs}:{jobs:any[]}){
   map=L.map(el.current).setView([43.72,-79.42],9);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
   const located=jobs.filter(j=>j.latitude&&j.longitude);
-  located.forEach(j=>L.marker([Number(j.latitude),Number(j.longitude)]).addTo(map).bindPopup(`<strong>${j.clients?.name||'Job'}</strong><br/>${j.request||''}`));
+  located.forEach(j=>L.marker([Number(j.latitude),Number(j.longitude)]).addTo(map).bindPopup((()=>{const content=document.createElement('div');const title=document.createElement('strong');title.textContent=j.clients?.name||'Job';const detail=document.createElement('p');detail.textContent=j.request||'';content.append(title,detail);return content})()));
   if(located.length){const b=L.latLngBounds(located.map(j=>[Number(j.latitude),Number(j.longitude)]));map.fitBounds(b.pad(.25))}
  })();return()=>{alive=false;if(map)map.remove()}},[jobs]);
  return <div className="dispatch-map" ref={el}/>;
