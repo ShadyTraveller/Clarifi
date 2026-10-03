@@ -55,7 +55,7 @@ export default function Home(){
  const [authEmail,setAuthEmail]=useState(''),[authPassword,setAuthPassword]=useState(''),[authMessage,setAuthMessage]=useState(''),[authBusy,setAuthBusy]=useState(false);
  const [role,setRole]=useState<string|null>(()=>{try{return localStorage.getItem('clarifi-role')}catch(e){return null}});
  const [mode,setMode]=useState<'field'|'office'>(()=>{try{return (localStorage.getItem('clarifi-mode') as any)||'office'}catch(e){return 'office'}});
- const [view,setView]=useState<View>('pipeline'),[menuOpen,setMenuOpen]=useState(false);
+ const [view,setView]=useState<View>('pipeline');
  const [search,setSearch]=useState('');
  const [loading,setLoading]=useState(true),[notice,setNotice]=useState('');
  const [clients,setClients]=useState<any[]>([]),[jobs,setJobs]=useState<any[]>([]),[quotes,setQuotes]=useState<any[]>([]),[invoices,setInvoices]=useState<any[]>([]),[templates,setTemplates]=useState<any[]>([]);
@@ -68,8 +68,8 @@ export default function Home(){
  const [depositPct,setDepositPct]=useState(''),[expiryDays,setExpiryDays]=useState('14');
  const [collectNote,setCollectNote]=useState('');
 
- function chooseRole(r:'tech'|'dispatch'){try{localStorage.setItem('clarifi-role',r);localStorage.setItem('clarifi-mode',r==='tech'?'field':'office')}catch(e){}setRole(r);const m=r==='tech'?'field':'office';setMode(m);setView(r==='tech'?'today':'pipeline');setMenuOpen(false);window.scrollTo({top:0,behavior:'instant'})}
- function go(v:View){setView(v);setMenuOpen(false);window.scrollTo({top:0,behavior:'instant'})}
+ function chooseRole(r:'tech'|'dispatch'){try{localStorage.setItem('clarifi-role',r);localStorage.setItem('clarifi-mode',r==='tech'?'field':'office')}catch(e){}setRole(r);const m=r==='tech'?'field':'office';setMode(m);setView(r==='tech'?'today':'pipeline');window.scrollTo({top:0,behavior:'instant'})}
+ function go(v:View){setView(v);window.scrollTo({top:0,behavior:'instant'})}
  function openJob(id:string){setSelectedJob(id);const j=jobs.find(x=>x.id===id);setStage(j?stageOf(j):'intake');setFieldQuote(null);setFieldCatalog([]);setDepositPct('');setNotice('');if(j)ensurePhotoRequirements(j);go('job')}
  function openCollect(id:string){setSelectedJob(id);setCollectNote('');const j=jobs.find(x=>x.id===id);if(j)ensurePhotoRequirements(j);go('collect')}
 
@@ -234,10 +234,7 @@ export default function Home(){
  if(session&&!role)return <main className="auth-shell"><section className="auth-form-side"><div className="auth-mobile-brand"><Brand/></div><div className="auth-card"><span className="auth-lock"><Icon name="lock"/></span><p className="eyebrow">CHOOSE YOUR VIEW</p><h2>How will you use Clarifi today?</h2><div className="form-grid"><button className="primary" onClick={()=>chooseRole('tech')}>I’m a technician</button><button className="secondary" onClick={()=>chooseRole('dispatch')}>I’m dispatch</button></div><p className="auth-help">Technicians collect field info. Dispatch runs the pipeline: clients, estimates, invoices, team.</p></div></section></main>;
 
  return <div className={`shell ${mode}-mode`}><a className="skip-link" href="#main-content">Skip to content</a>
-  <header className="topbar"><button className="icon-button mobile-menu" aria-label="Menu" onClick={()=>setMenuOpen(!menuOpen)}><Icon name="menu"/></button><span className="brand-button" onClick={()=>go(mode==='office'?'pipeline':'today')}><Brand/></span><span className="top-actions"><span className="workspace-label">{role==='tech'?'Technician':'Dispatch'}</span><button className="icon-button" aria-label="Sign out" onClick={signOut}><Icon name="logout"/></button></span></header>
-  <nav className={`sidebar${menuOpen?' is-open':''}`} aria-label="Primary">{menuOpen&&<button className="menu-backdrop" aria-label="Close menu" onClick={()=>setMenuOpen(false)}/>}
-   {navItems.map(v=><button key={v} className={view===v||(v==='pipeline'&&view==='job')?'nav-active':''} onClick={()=>go(v)}><Icon name={v==='pipeline'?'overview':v==='today'?'calendar':v}/>{navLabels[v]}</button>)}
-   <div className="sidebar-footer"><span>{session.user?.email}</span></div></nav>
+  <header className="topbar"><span className="brand-button" onClick={()=>go(mode==='office'?'pipeline':'today')}><Brand/></span><nav className="topnav" aria-label="Primary">{navItems.map(v=><button key={v} className={view===v||(v==='pipeline'&&view==='job')?'nav-active':''} onClick={()=>go(v)}><Icon name={v==='pipeline'?'overview':v==='today'?'calendar':v}/>{navLabels[v]}</button>)}</nav><span className="top-actions"><span className="workspace-label">{role==='tech'?'Technician':'Dispatch'}</span><button className="icon-button" aria-label="Sign out" onClick={signOut}><Icon name="logout"/></button></span></header>
   <main id="main-content" className="main-shell">
    {view==='pipeline'&&pipelineHome}
    {view==='job'&&jobDetail()}
