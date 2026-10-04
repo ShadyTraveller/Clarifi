@@ -15,7 +15,11 @@ const fs = require('node:fs');
   await page.route('https://jgbciyogyratfplofizv.supabase.co/**', async route => {
     const u=new URL(route.request().url()),body=route.request().postDataJSON?.()||{};
     if(route.request().method()==='OPTIONS') return send(route,{});
-    if(u.pathname.endsWith('/auth/v1/token')) return send(route,{access_token:token,refresh_token:'fixture',expires_in:3600,token_type:'bearer',user});
+    if(u.pathname.endsWith('/auth/v1/token')) {
+      if(body.password!=='fixture-password') return send(route,{error_code:'invalid_credentials',msg:'Invalid login credentials'},400);
+      assert.equal(body.email,'fixture@example.invalid');
+      return send(route,{access_token:token,refresh_token:'fixture',expires_in:3600,token_type:'bearer',user});
+    }
     if(u.pathname.endsWith('/auth/v1/user')) return send(route,user);
     const table=u.pathname.split('/').pop();
     if(table==='organization_members') return send(route,u.search.includes('user_id')?{organization_id:org,user_id:id,role:'owner',active:true}:[{organization_id:org,user_id:id,role:'owner',active:true}]);
@@ -25,9 +29,16 @@ const fs = require('node:fs');
     return send(route,({clients,jobs,quotes,scope_templates:templates})[table]||[]);
   });
   await page.route('**/api/assistant',async route=>{const b=route.request().postDataJSON();if(b.action==='request')return send(route,{client:{name:'Fixture Client',role:'owner',phone:'416-555-0123',email:'',address:'Toronto'},title:'Residential lock change',details:'Replace loose gripset',service:'Locksmith',markdown:'# Residential lock change\n\nReplace loose gripset.\n\n## Assignment\nUnassigned',technician_id:null,latitude:null,longitude:null,assignment_reason:'Unassigned'});return send(route,{scope:'# Lock replacement\n\nInstall matte black gripset.',lines:[{name:'Installation',quantity:1,unit:'hour',cost:null,price:null}],products:[{name:'Fixture gripset',supplier:'Home Depot Canada',cost:100,url:'https://www.homedepot.ca/product/fixture',image:null,evidence:'Fixture only',checked_at:new Date().toISOString()}],notes:'Confirm labour',template_name:'Locksmith'});});
-  await page.goto('http://127.0.0.1:3000');
+  await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3000');
   await page.getByRole('button',{name:'Dispatch',exact:true}).click();
-  await page.getByRole('textbox',{name:'Email address'}).fill('fixture@example.invalid');
+  await page.getByRole('textbox',{name:'Email address'}).fill('FIXTURE@EXAMPLE.INVALID ');
+  await page.getByRole('textbox',{name:'Password',exact:true}).fill('fixture-wrong-password');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.locator('.auth-card [role="alert"]').waitFor();
+  assert.match(await page.locator('.auth-card [role="alert"]').innerText(), /The email or password does not match\./);
+  await page.getByRole('button',{name:'Show password',exact:true}).click();
+  assert.equal(await page.getByLabel('Password',{exact:true}).getAttribute('type'),'text');
+  await page.getByRole('button',{name:'Hide password',exact:true}).click();
   await page.getByRole('textbox',{name:'Password'}).fill('fixture-password');
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByRole('heading',{name:'Turn the call into the job.'}).waitFor();
