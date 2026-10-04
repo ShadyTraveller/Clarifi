@@ -3,3 +3,7 @@ node_modules/
 .env*.local
 .vercel/
 *.tsbuildinfo
+.pnpm-store/
+.tools/
+verification-*.png
+.verification/

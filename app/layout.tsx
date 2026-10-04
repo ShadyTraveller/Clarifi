@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css'
 import 'leaflet/dist/leaflet.css';
+import 'katex/dist/katex.min.css';
+import './workspace.css';
 
 export const metadata: Metadata = {
   title: 'Clarifi — Service Operations',

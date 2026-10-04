@@ -1,1 +1,0 @@
-{"expo":{"name":"Clarifi Tech","slug":"clarifi-tech","scheme":"clarifi","version":"0.1.0","orientation":"portrait","userInterfaceStyle":"light","plugins":["expo-router"],"ios":{"supportsTablet":true,"bundleIdentifier":"app.clarifi.tech"},"android":{"package":"app.clarifi.tech"},"web":{"bundler":"metro"}}}

@@ -1,35 +1,23 @@
-# Clarifi MVP architecture
+# Clarifi architecture
 
-## Delivery sequence
+The Next.js application runs on Vercel. Supabase provides Auth, PostgreSQL with row-level security, private job-file storage and the existing customer approval function.
 
-1. Ship the mobile-friendly Next.js website first. Field mode provides Today / Quote / Scope / Photos, while Office mode preserves the operations workspace. All records remain in Supabase.
-2. Validate the field workflow on phones before resuming native builds.
-3. Introduce the Expo client using the existing PostgreSQL RPC contracts; do not duplicate pricing rules. The `mobile/` package is a future client, not the primary MVP release.
+## Request and estimate flow
 
-## Clients
-- **Back-office web:** current Next.js dashboard, responsive and optimized for dispatch/office workflows.
-- **Technician mobile:** React Native + Expo client. It should consume the same authenticated service contract rather than duplicate pricing logic.
-- **Customer estimate:** narrow secure-link experience; no customer account required.
+Browser calls include the authenticated user's bearer token. Server handlers validate it with Supabase getUser and require active organization membership. Only the server creates OpenAI requests, with response storage disabled. The OpenAI key is never serialized to the browser.
 
-Expo supports Android, iOS and web from a shared TypeScript/React Native codebase. The native technician app should be introduced as a separate client package when store builds begin; the existing Next.js office dashboard does not need to be rewritten first.
+Request drafts remain editable before an atomic create_clarifi_request call. Specialty matching uses recent coordinates and geographic distance. Unknown locations leave work unassigned.
 
-## API / service boundary
-- Supabase Auth identifies staff.
-- Shipped web/mobile clients use the Supabase **publishable** key only.
-- PostgreSQL RLS is the authorization boundary for ordinary authenticated operations.
-- Supabase Edge Functions / controlled server routes handle public secure links, provider integrations, webhooks, rate limiting and operations requiring a Supabase secret key.
-- Secret/service-role credentials must never be shipped in browser or Expo bundles.
+Estimate calculations use confirmed dimensions and customer prices. Supplier URLs must match approved HTTPS retailer domains and search sources. Product-page structured data may confirm a CAD price and photo; missing data remains unconfirmed. save_clarifi_estimate writes the version and lines atomically. Customer scope and totals exclude internal costs and supplier sourcing.
 
-## Core field-quote contract
-1. `start_field_quote(job, template)` clones master `template_pricing_items` into job-owned `field_quote_items`.
-2. Technician edits the job-owned instance only.
-3. `field_quote_catalog(job, search)` searches the local material catalog.
-4. `add_field_quote_material` and `update_field_quote_quantity` mutate the active job quote.
-5. `calculate_field_quote` applies pricing profile, markup, emergency multiplier and tax.
-6. `finalize_field_quote` captures typed-name approval, snapshots an immutable quote/version, activates the job subject to service-call rules, and creates a draft invoice outline.
+## Customer approvals
 
-## Material catalog
-Canonical storage remains `supplier_products`. The RLS-aware `supplier_materials` view is the stable MVP catalog contract for client/service code. Entries may be internal allowances, manually verified Home Depot Canada/Amazon.ca records, or future authorized supplier adapters. Source and verification timestamp must remain visible internally.
+Dispatch issues a version-bound, expiring approval token. The database stores its hash. Server routes proxy the existing customer function and return only the customer projection. Repeated approval is idempotent. Payment collection and automatic delivery remain deferred.
 
-## UX rule
-Progressive disclosure. Technician primary path is **Today / Job / Quote / Complete**. Office primary path is **Intake / Scope / Price / Send / Approve / Dispatch**. Supplier pricing, payments and customer links stay contextual rather than permanent top-level navigation.
+## Field work
+
+Technicians see their assigned daily jobs. Location sharing requires an explicit action; dispatch refreshes stored locations periodically. Photos use private storage and short-lived signed URLs. AI photo results describe visible evidence; checklist completion remains manual and skincare output does not diagnose conditions.
+
+## Verification
+
+Domain tests cover measurement conversion, totals, assignment and supplier URL boundaries. Browser fixtures cover request creation, estimate editing, client preview and responsive navigation. Live database checks use rollback transactions. A secret scan checks the compiled browser assets. Provider billing must be active to verify live AI generation.
