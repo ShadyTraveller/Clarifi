@@ -1,4 +1,4 @@
-# Clarifi architecture
+# Yavamo architecture
 
 The Next.js application runs on Vercel. Supabase provides Auth, PostgreSQL with row-level security, private job-file storage and the existing customer approval function.
 

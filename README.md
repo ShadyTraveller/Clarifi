@@ -1,4 +1,6 @@
-# Clarifi
+# Yavamo
+
+Website: https://www.yavamo.ca. The repository directory and Supabase/Vercel resource names remain Clarifi. Existing database RPC and storage identifiers are retained for compatibility.
 
 A responsive service workspace for dispatch and technicians. Requests, the dispatch map and estimates sit alongside the existing Clients, Invoices and Team views. Services cover security film, locksmith rekey/lock changes, windows, doors and skincare.
 
