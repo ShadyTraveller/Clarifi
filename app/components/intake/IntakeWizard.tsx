@@ -8,7 +8,7 @@ import { supabase } from '../../lib_supabase';
 
 // ---------- types ----------
 
-type Role = 'owner' | 'tenant' | 'property_management' | 'commercial' | 'other';
+type Role = 'owner' | 'tenant' | 'property_management' | 'institution' | 'commercial' | 'other';
 
 interface JobAnswers {
   // locksmith
@@ -67,6 +67,7 @@ const ROLE_OPTIONS: { value: Role; display: string; note?: string }[] = [
   { value: 'tenant', display: 'Tenant' },
   { value: 'owner', display: 'Landlord', note: 'Landlords are billed as the property owner.' },
   { value: 'property_management', display: 'Property Management' },
+  { value: 'institution', display: 'Institution', note: 'Schools, congregations, non-profits and other organizations.' },
   { value: 'commercial', display: 'Commercial' },
   { value: 'other', display: 'Other' },
 ];

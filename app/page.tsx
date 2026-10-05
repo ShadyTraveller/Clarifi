@@ -34,7 +34,10 @@ const DEFAULT_TEMPLATES=[
 ];
 
 /* Deposit % defaults by client relationship. Office can override per quote. */
-const DEPOSIT_PCT:Record<string,number>={property_management:25,commercial:25,owner:50,landlord:50,tenant:100,other:50};
+const DEPOSIT_PCT:Record<string,number>={property_management:25,commercial:25,institution:50,owner:50,landlord:50,tenant:100,other:50};
+
+/* Shareable client self-intake (Google Form). Native stepped intake stays the dispatch-side path. */
+const CLIENT_FORM_URL='https://forms.gle/RwSfsogXkJLjuqct5';
 
 type StageKey='intake'|'scope'|'price'|'review'|'approve'|'dispatch'|'done';
 const STAGES:{key:StageKey,label:string,icon:string}[]=[
@@ -68,6 +71,7 @@ export default function Home(){
  const [collectNote,setCollectNote]=useState('');
  const [showEstimate,setShowEstimate]=useState(false),[estimateJob,setEstimateJob]=useState(''),[showHelp,setShowHelp]=useState(false),[showTech,setShowTech]=useState(false);
  const [quoteLinks,setQuoteLinks]=useState<Record<string,string>>({});
+ const [showClientForm,setShowClientForm]=useState(false),[formCopied,setFormCopied]=useState(false),[webhookConfigured,setWebhookConfigured]=useState<boolean|null>(null);
  const [reviewLines,setReviewLines]=useState<any[]>([]);
  const [reviewEmail,setReviewEmail]=useState('');
  const [sendingEmail,setSendingEmail]=useState(false);
@@ -169,7 +173,7 @@ export default function Home(){
   if(!j.scheduled_start)return 'Schedule visit';
   return 'Mark complete';
  }
- const pipelineHome=<><div className="view-heading"><div><p className="eyebrow">PIPELINE</p><h1>Jobs</h1><p className="view-description">Lead → estimate → job → completed. Tap a card to open the job thread.</p></div><div className="button-wrap">{newRequest}</div></div>
+ const pipelineHome=<><div className="view-heading"><div><p className="eyebrow">PIPELINE</p><h1>Jobs</h1><p className="view-description">Lead → estimate → job → completed. Tap a card to open the job thread.</p></div><div className="button-wrap">{newRequest}<button className="secondary" onClick={()=>{setShowClientForm(true);setFormCopied(false);setWebhookConfigured(null);fetch('/api/intake/google-form').then(r=>r.json()).then(d=>setWebhookConfigured(!!d.configured)).catch(()=>setWebhookConfigured(false))}}><Icon name="link"/>Client self-intake</button></div></div>
  {notice&&<p className="notice" role="status">{notice}</p>}
  {loading?<p role="status">Loading jobs…</p>:filteredJobs.length?<><div className="filter-bar"><label className="search-input"><Icon name="search"/><input aria-label="Search jobs" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client, address, service…"/></label><span className="result-count">{filteredJobs.length} jobs</span></div><div className="pipeline-board">{BOARD_COLS.map(col=>{const cards=filteredJobs.filter(j=>boardColOf(j)===col.key);return <section className="pipeline-column" key={col.key} aria-label={col.label}><header><h2>{col.label}</h2><span className="pipeline-count">{cards.length}</span></header>{cards.map(j=>{const q=latestQuote(j.id);return <article className="job-card" key={j.id}><button className="job-card-main" onClick={()=>openJob(j.id)} aria-label={`Open ${j.clients?.name||'client'} job`}><div className="job-card-top">{stageBadge(j)}<small>{serviceLabel(j.service||'')}</small></div><h2>{j.clients?.name||'Client'}</h2><p>{j.request}</p><small>{j.clients?.address||'Address needed'}</small><div className="job-card-footer"><span>{techs.find(t=>t.id===j.technician_id)?.name||'Unassigned'}</span>{q&&<strong>{money(q.total)}</strong>}</div><span className="next-action">{nextAction(j)} →</span></button></article>})}{!cards.length&&<p className="helper">Nothing here.</p>}</section>})}</div></>:<section className="first-step"><div><span className="step-number">01</span><h2>Start with the call.</h2><p>Name, contact, property role, address, and the problem. The request comes back structured with an assignment or a clear unassigned state.</p><button className="text-button" onClick={()=>setShowIntake(true)}>Create first request ↗</button></div><div className="call-example"><p className="eyebrow">CLIENT SAYS…</p><blockquote>“Residential lock change. Existing gripset is loose. Wants matte black.”</blockquote><footer><span>● Yavamo request</span><span>↵</span></footer></div></section>}
  </>;
@@ -289,6 +293,16 @@ export default function Home(){
    {view==='invoices'&&invoicesView}
   </main><footer className="workspace-footer"><span>yavamo. <span>Clear scope. Connected work.</span></span></footer>
   <nav className="bottom-nav" aria-label="Primary">{navItems.map(v=><button key={v} className={view===v||(v==='pipeline'&&view==='job')?'nav-active':''} aria-current={view===v?'page':undefined} onClick={()=>go(v)}><Icon name={v==='pipeline'?'jobs':v==='dispatch'?'map':v==='estimates'?'quote':v==='clients'?'clients':v==='today'?'calendar':'jobs'}/>{navLabels[v]}</button>)}</nav>
+  {showClientForm&&<Modal title="Client self-intake form" onClose={()=>setShowClientForm(false)}>
+  <p className="helper">Text or email this link to the client. Their answers arrive in the pipeline as a Lead automatically once the form webhook is connected — no retyping.</p>
+  <label>Form link<input readOnly value={CLIENT_FORM_URL} onFocus={e=>e.target.select()} aria-label="Client self-intake form link"/></label>
+  <div className="button-wrap">
+    <button className="secondary" onClick={()=>{navigator.clipboard?.writeText(CLIENT_FORM_URL).then(()=>setFormCopied(true)).catch(()=>setNotice('Copy failed — long-press the link to copy it.'))}}><Icon name="link"/>{formCopied?'Link copied ✓':'Copy link'}</button>
+    <a className="secondary" href={CLIENT_FORM_URL} target="_blank" rel="noopener noreferrer">Open form ↗</a>
+  </div>
+  <p className="helper" role="status">{webhookConfigured==null?'Checking auto-import status…':webhookConfigured?'Auto-import: connected — form answers create leads automatically.':'Auto-import: not connected — set GOOGLE_FORM_WEBHOOK_SECRET in Vercel and complete the 3-step Apps Script setup (docs/google-form-webhook.gs).'}</p>
+  <details><summary>What the form asks</summary><p className="helper">Page 1: name, email, phone, address. Page 2: client type (tenant, landlord, property management, institution, commercial), job details, photos. Anything else Lavie adds later is imported into the lead's notes automatically.</p></details>
+ </Modal>}
   {showIntake&&<IntakeWizard orgId={orgId} onClose={()=>setShowIntake(false)} onSaved={async id=>{await loadData();setSelectedJob(id);setStage('intake');go('job')}}/>}
   {showEstimate&&mode==='office'&&<EstimateBuilder jobs={jobs} initialJobId={estimateJob} onClose={()=>setShowEstimate(false)} onSaved={async()=>{await loadData();go('estimates');setNotice('Estimate saved as draft. Office review is required before an approval link can be created.')}}/>}
   {showHelp&&<Modal title="Work, with fewer clicks." onClose={()=>setShowHelp(false)}><p>Write the call or diagnosis, review the draft, then save. Photos show visible evidence; measurement and price confirmation stay editable.</p><dl className="help-shortcuts"><div><dt>Requests</dt><dd>Alt + 1</dd></div><div><dt>Dispatch map</dt><dd>Alt + 2</dd></div><div><dt>Estimates</dt><dd>Alt + 3</dd></div><div><dt>New request</dt><dd>Alt + N</dd></div><div><dt>New estimate</dt><dd>Alt + E</dd></div></dl><p className="helper">Spanish translation changes the answer only. The workspace remains in English.</p></Modal>}
