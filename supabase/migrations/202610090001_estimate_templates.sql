@@ -33,6 +33,11 @@
 -- only quote_line_items.unit_price / total. No client-facing policies are created
 -- on these tables for that reason.
 
+-- 2026-10-08: the live DB had a stray VIEW named public.supplier_materials
+-- (not created by any migration; views hold no data and nothing references it).
+-- Drop it so the real catalog table below can be created.
+drop view if exists public.supplier_materials;
+
 create table if not exists public.estimate_templates (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
