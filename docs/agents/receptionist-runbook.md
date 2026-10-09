@@ -255,11 +255,14 @@ to notes. If none → treat as new and note the ambiguity in the summary.
 
 ### Step 8 — Assessment → estimate trigger sweep (runs every cycle)
 
-This section is independent of the inbox work. For each job the tech marked
+This section is independent of the inbox work. Find jobs the tech marked
 **complete** since the last run:
 
-1. Call **`POST /api/agents/job-complete`** with `{organization_id, job_id}`
-   and the `Authorization: Bearer $CRON_SECRET` header.
+1. Call **`GET /api/agents/jobs?organization_id=<org>&status=completed&completed_since=<2 hours ago, ISO>`**
+   with the `Authorization: Bearer $CRON_SECRET` header, then call
+   **`POST /api/agents/job-complete`** with `{organization_id, job_id}` for
+   each returned job. The route is idempotent (`already_guarded: true` on
+   re-sweeps), so a 2-hour overlap window is safe.
 2. **If the route reports the completion was reverted** (mistake-guard:
    tech tapped complete but uploaded no notes/photos) → **email the office**
    (ainearby@gmail.com — a real send is allowed here because it's an internal

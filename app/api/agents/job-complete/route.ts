@@ -65,6 +65,20 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, noop: true });
     }
 
+    // Idempotency: a completed job the guard already cleared must not be
+    // re-reported (avoids duplicate estimate-draft triggers on re-sweeps).
+    const { data: guardRow } = await db
+      .from('job_events')
+      .select('id')
+      .eq('organization_id', organization_id)
+      .eq('job_id', job.id)
+      .eq('event_type', 'completion_guarded')
+      .limit(1)
+      .maybeSingle();
+    if (guardRow) {
+      return Response.json({ ok: true, already_guarded: true });
+    }
+
     const [{ data: events }, { data: files }] = await Promise.all([
       db
         .from('job_events')
@@ -126,6 +140,12 @@ export async function POST(request: Request) {
 
     const notesText = texts.join('\n').toLowerCase();
     const hasAssessment = /assess|part|material|diagnos|replac|repair/.test(notesText);
+    await db.from('job_events').insert({
+      organization_id,
+      job_id: job.id,
+      event_type: 'completion_guarded',
+      metadata: { by: 'mistake-guard', has_assessment: hasAssessment },
+    });
     return Response.json({ ok: true, reverted: false, hasAssessment });
   } catch (error) {
     return Response.json({ error: 'The completion check could not run.' }, { status: 500 });
