@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Yavamo",
+    "slug": "yavamo-mobile",
+    "scheme": "yavamo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["android", "web"],
+    "android": { "package": "ca.yavamo.mobile" },
+    "plugins": ["expo-router", "expo-secure-store", "expo-font"],
+    "web": { "bundler": "metro", "output": "single" }
+  }
+}
