@@ -167,12 +167,13 @@ delete or archive `part_tracking` rows — the office owns that table's lifecycl
 
 ### Step 6 — Pricing double-check ("price unverified" flags)
 
-Draft estimates surface, per part, the **source URL + public CAD price** used
-for the 20% margin audit. Any part flagged `price unverified` (tech couldn't
-find a public price, or the route couldn't confirm one) gets a human check from
-you:
+Draft estimates already surface `price unverified` / `needs_review` flags in
+their `internal_notes`, and the agent-output feed shows them to the office —
+the office review gate is the primary checkpoint, not this step. Your job here
+is a best-effort spot-check only:
 
-1. Open the part's supplier URL (from the estimate's `source_url` field).
+1. Pick up to 3 flagged parts; open each part's supplier URL (from the
+   estimate's `internal_notes` — never from client-visible fields).
 2. Confirm the **CAD** price shown on the page matches the price on the draft
    estimate (watch for USD-vs-CAD, sale-vs-regular, and per-unit-vs-pack traps).
 3. **Discrepancy found** → email the office (ainearby@gmail.com):
@@ -183,9 +184,9 @@ you:
    Supplier page shows: ${page_price} CAD (checked {date})
    Difference affects the 20% margin line — office decision needed.
    ```
-4. **No discrepancy** → clear the `price unverified` flag via the route/API
-   (expected `{"action":"verify-price", "part_tracking_id"/"estimate_line_id":
-   "..."}` — verify the exact verb), so the office stops seeing it.
+4. **No discrepancy** → just note it in your run summary. There is NO
+   flag-clearing API — do not invent one. The office clears the flag when
+   they finalize the estimate.
 5. **Never change the margin or the price yourself.** You verify and report;
    the office adjusts.
 
