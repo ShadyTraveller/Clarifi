@@ -167,49 +167,12 @@ delete or archive `part_tracking` rows — the office owns that table's lifecycl
 
 ### Step 6 — Pricing double-check ("price unverified" flags)
 
-Draft estimates already surface `price unverified` / `needs_review` flags in
-their `internal_notes`, and the agent-output feed shows them to the office —
-the office review gate is the primary checkpoint, not this step. Your job here
-is a best-effort spot-check only:
-
-1. Pick up to 3 flagged parts; open each part's supplier URL (from the
-   estimate's `internal_notes` — never from client-visible fields).
-2. Confirm the **CAD** price shown on the page matches the price on the draft
-   estimate (watch for USD-vs-CAD, sale-vs-regular, and per-unit-vs-pack traps).
-3. **Discrepancy found** → email the office (ainearby@gmail.com):
-   ```
-   Subject: [Yavamo warehouse] Price mismatch — {part_name}
-
-   Estimate lists: ${estimate_price} CAD (source: {source_url})
-   Supplier page shows: ${page_price} CAD (checked {date})
-   Difference affects the 20% margin line — office decision needed.
-   ```
-4. **No discrepancy** → just note it in your run summary. There is NO
-   flag-clearing API — do not invent one. The office clears the flag when
-   they finalize the estimate.
-5. **Never change the margin or the price yourself.** You verify and report;
-   the office adjusts.
-
-### Step 7 — Write the run summary
-
-```
-WAREHOUSE RUN — <YYYY-MM-DD HH:MM America/Toronto>
-Parts due: <n>
-- status checked: <n>
-- changed → office emailed: <n> (out_for_delivery <n>, delivered <n>, delayed <n>, ETA changed <n>)
-- unknown → check manually: <n> [<tracking numbers>]
-- errors (route missing/down): <list or "none">
-Price flags: <n> reviewed → cleared <n>, mismatches emailed <n>, still unverified <n>
-Skipped steps (would violate hard rules or missing backend): <list or "none">
-Notes for office: <anything odd>
-```
-
-**"Done" for a warehouse run =** every due part got a check attempt (or a
-documented skip), every genuine status change produced exactly one office email,
-no status was invented, every price flag got a verdict, and the summary was
-written. Zero orders placed, zero client contact, zero invoice touches.
-
----
+Retired as a worker duty. Draft estimates surface `price unverified` /
+`needs_review` flags in their `internal_notes` and the agent-output feed, and
+the office review gate is the sole checkpoint — the office clears flags while
+finalizing estimates. There is intentionally no worker API to enumerate flagged
+drafts; adding one would only duplicate the office's job. Skip this step and do
+not report it as a gap.
 
 ## 4. How the office registers a part (so the agent picks it up)
 
