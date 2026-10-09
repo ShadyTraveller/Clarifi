@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
+// classify.ts moved to @yavamo/core (packages/core/src/classify.ts) on 2026-10-09.
+// Windows is out of scope: the 'windows' key, its questions and its keyword
+// signals were removed — SERVICE_QUESTIONS now covers the 4 in-scope services.
 const classifyUrl = 'data:text/javascript;base64,' + Buffer.from(
-  stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/agents/classify.ts', import.meta.url), 'utf8'))
+  stripTypeScriptTypes(fs.readFileSync(new URL('../packages/core/src/classify.ts', import.meta.url), 'utf8'))
 ).toString('base64');
 
 const {
@@ -130,8 +133,8 @@ test('isBusinessHours: Friday 17:00 Toronto is after hours (closing edge)', () =
 
 // ---- SERVICE_QUESTIONS ----
 
-test('SERVICE_QUESTIONS covers all 5 services with 3-5 practical questions each', () => {
-  for (const key of ['windows', 'doors', 'security_film', 'locksmith', 'skincare']) {
+test('SERVICE_QUESTIONS covers the 4 in-scope services with 3-5 practical questions each', () => {
+  for (const key of ['doors', 'security_film', 'locksmith', 'skincare']) {
     const qs = SERVICE_QUESTIONS[key];
     assert.ok(Array.isArray(qs), key);
     assert.ok(qs.length >= 3 && qs.length <= 5, `${key} has ${qs.length} questions`);

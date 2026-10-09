@@ -2,7 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-const code = stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/domain.ts', import.meta.url), 'utf8'));
+// 2026-10-09: domain.ts re-exports roundMoney from @yavamo/core — resolve it.
+const pricingUrl = 'data:text/javascript;base64,' + Buffer.from(
+  stripTypeScriptTypes(fs.readFileSync(new URL('../packages/core/src/pricing.ts', import.meta.url), 'utf8'))
+).toString('base64');
+const code = stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/domain.ts', import.meta.url), 'utf8'))
+  .replaceAll("'@yavamo/core'", JSON.stringify(pricingUrl));
 const { squareFeet, totals, closestTechnician, hasCoordinates, approvedSupplierUrl } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 const domainUrl = 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
 const draftCode = stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/free-drafts.ts', import.meta.url), 'utf8')).replace("'./domain'", JSON.stringify(domainUrl));

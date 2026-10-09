@@ -1,60 +1,27 @@
 import { PHOTO_CHECKLISTS } from './domain';
-import type { Service } from './domain';
+import { LABOR_TIERS } from '@yavamo/core';
+import type {
+  LaborTierKey,
+  ServiceTemplate,
+  TemplateLabor,
+  TemplateMargin,
+  TemplateMaterial,
+  TemplateMeasurement,
+} from '@yavamo/core';
 
-export type LaborTierKey = 'standard' | 'priority' | 'emergency';
-
-export const LABOR_TIERS: { key: LaborTierKey; label: string; rate: number }[] = [
-  { key: 'standard', label: 'Standard', rate: 150 },
-  { key: 'priority', label: 'Priority', rate: 180 },
-  { key: 'emergency', label: 'Emergency / Complex / Two-tech', rate: 220 },
-];
-
-export function tierRate(key: LaborTierKey): number {
-  return LABOR_TIERS.find(t => t.key === key)?.rate ?? LABOR_TIERS[0].rate;
-}
-
-export interface TemplateMaterial {
-  id: string;
-  name: string;
-  unit: string;
-  defaultQty: number;
-  placeholder: boolean;
-  notes?: string;
-}
-
-export interface TemplateLabor {
-  id: string;
-  name: string;
-  defaultHours: number;
-  defaultTier: LaborTierKey;
-}
-
-export interface TemplateMeasurement {
-  key: string;
-  label: string;
-  unit: string;
-  required: boolean;
-}
-
-export interface TemplateMargin {
-  laborMarginPct: number;
-  materialMarkupPct: number;
-  materialMarkupMax?: number;
-  netWarnBelow: number;
-  note: string;
-}
-
-export interface ServiceTemplate {
-  key: string;
-  service: Service;
-  name: string;
-  description: string;
-  materials: TemplateMaterial[];
-  labor: TemplateLabor[];
-  measurements: TemplateMeasurement[];
-  photoChecklist: string[];
-  margin: TemplateMargin;
-}
+// The canonical pricing engine and its types live in @yavamo/core
+// (packages/core/src). This module keeps the template catalogue data and
+// getTemplate(); the moved names are re-exported so existing import sites
+// keep working.
+export { LABOR_TIERS };
+export type {
+  LaborTierKey,
+  ServiceTemplate,
+  TemplateLabor,
+  TemplateMargin,
+  TemplateMaterial,
+  TemplateMeasurement,
+};
 
 export const SERVICE_TEMPLATES: ServiceTemplate[] = [
   {

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
+// assessCompletion moved to @yavamo/core (packages/core/src/classify.ts) on 2026-10-09.
 const guardUrl = 'data:text/javascript;base64,' + Buffer.from(
-  stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/agents/mistake-guard.ts', import.meta.url), 'utf8'))
+  stripTypeScriptTypes(fs.readFileSync(new URL('../packages/core/src/classify.ts', import.meta.url), 'utf8'))
 ).toString('base64');
 
 const { assessCompletion } = await import(guardUrl);

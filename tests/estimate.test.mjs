@@ -3,19 +3,27 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
-const domainUrl = 'data:text/javascript;base64,' + Buffer.from(
-  stripTypeScriptTypes(fs.readFileSync(new URL('../app/lib/domain.ts', import.meta.url), 'utf8'))
+// 2026-10-09: the deterministic engine moved to @yavamo/core
+// (packages/core/src). Load the canonical modules directly; './types' imports
+// are import-type-only and erased by stripTypeScriptTypes.
+const pricingUrl = 'data:text/javascript;base64,' + Buffer.from(
+  stripTypeScriptTypes(fs.readFileSync(new URL('../packages/core/src/pricing.ts', import.meta.url), 'utf8'))
 ).toString('base64');
+
+const domainCode = stripTypeScriptTypes(
+  fs.readFileSync(new URL('../app/lib/domain.ts', import.meta.url), 'utf8')
+).replaceAll("'@yavamo/core'", JSON.stringify(pricingUrl));
+const domainUrl = 'data:text/javascript;base64,' + Buffer.from(domainCode).toString('base64');
 
 const templatesCode = stripTypeScriptTypes(
   fs.readFileSync(new URL('../app/lib/service-templates.ts', import.meta.url), 'utf8')
-).replaceAll("'./domain'", JSON.stringify(domainUrl));
+).replaceAll("'./domain'", JSON.stringify(domainUrl))
+  .replaceAll("'@yavamo/core'", JSON.stringify(pricingUrl));
 const templatesUrl = 'data:text/javascript;base64,' + Buffer.from(templatesCode).toString('base64');
 
 const estimateCode = stripTypeScriptTypes(
-  fs.readFileSync(new URL('../app/lib/estimate.ts', import.meta.url), 'utf8')
-).replaceAll("'./domain'", JSON.stringify(domainUrl))
-  .replaceAll("'./service-templates'", JSON.stringify(templatesUrl));
+  fs.readFileSync(new URL('../packages/core/src/estimate.ts', import.meta.url), 'utf8')
+).replaceAll("'./pricing'", JSON.stringify(pricingUrl));
 const { buildEstimate, customerProjection } = await import(
   'data:text/javascript;base64,' + Buffer.from(estimateCode).toString('base64')
 );

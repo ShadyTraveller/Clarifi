@@ -25,7 +25,10 @@ export function squareFeet(width: number, height: number, count = 1) {
   if (![width, height, count].every(Number.isFinite) || width <= 0 || height <= 0 || count <= 0) return 0;
   return width * height * count / 144;
 }
-export const roundMoney = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+import { roundMoney } from '@yavamo/core';
+// Canonical money rounding lives in @yavamo/core (packages/core/src/pricing.ts);
+// re-exported here so existing domain.ts consumers are unaffected.
+export { roundMoney };
 export function totals(lines: EstimateLine[], taxPct = 13, depositPct = 50) {
   const subtotal = roundMoney(lines.reduce((sum, l) => sum + roundMoney(l.quantity * (l.price ?? 0)), 0));
   const tax = roundMoney(subtotal * taxPct / 100), total = roundMoney(subtotal + tax);

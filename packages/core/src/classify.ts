@@ -1,8 +1,17 @@
-// Receptionist agent helpers: deterministic text classification and draft builders.
-// Server-safe: no React, no AI calls, no randomness, no invented prices.
+// @yavamo/core — deterministic text classification, draft builders, and the
+// job-completion mistake guard.
+// No React, no AI calls, no randomness, no invented prices.
+//
+// Moved verbatim on 2026-10-09 from app/lib/agents/classify.ts
+// (isOutOfScope, hasExtension, isBusinessHours, SERVICE_QUESTIONS and the draft
+// builders, classifyAssist) and app/lib/agents/mistake-guard.ts
+// (assessCompletion). One deliberate scope change versus the originals:
+// WINDOWS IS OUT — the 'windows' service key, its question set, its keyword
+// signals and its mention in the decline-draft service list have been removed,
+// per Lavie's 2026-10-08 scope decision (doors, security film, locksmith,
+// skincare only). Everything else is behaviour-identical.
 
-/** Service keys shared with the intake templates (see app/lib/domain.ts SERVICES). */
-export type AgentServiceKey = 'windows' | 'doors' | 'security_film' | 'locksmith' | 'skincare';
+import type { AgentServiceKey, CompletionEvent } from './types';
 
 interface OutOfScopeRule {
   pattern: RegExp;
@@ -63,12 +72,6 @@ export function isBusinessHours(d: Date = new Date(), timeZone = 'America/Toront
 
 /** Detail questions the inquiry template asks for, per service. 'generic' is the fallback. */
 export const SERVICE_QUESTIONS: Record<string, string[]> = {
-  windows: [
-    'How many windows are involved?',
-    'What are the approximate width and height of each window?',
-    'Is the glass broken, foggy, or just old?',
-    'What floor is the window on, and is there clear access to it?',
-  ],
   doors: [
     'How many doors need work — repair or full replacement?',
     'Is it an entry door, interior door, or patio/sliding door?',
@@ -108,7 +111,6 @@ function questionsFor(service: string): string[] {
 }
 
 const SERVICE_AREA_LABEL: Record<string, string> = {
-  windows: 'window',
   doors: 'door',
   security_film: 'security film',
   locksmith: 'lock',
@@ -164,7 +166,7 @@ export function buildDeclineDraft(opts: { name: string; reason: string | null })
     body:
       `Hi ${name},\n\n` +
       `Thanks for reaching out to Yavamo. We don't have anyone available at this time for ${reason} — it's outside the services we offer.\n\n` +
-      `Our services: windows, doors, security film, locksmithing (rekey/lock change — no cars), and private skincare treatments.\n\n` +
+      `Our services: doors, security film, locksmithing (rekey/lock change — no cars), and private skincare treatments.\n\n` +
       `Wishing you the best finding the right help.\n\n` +
       `— Yavamo`,
   };
@@ -177,8 +179,9 @@ interface ServiceSignal {
 }
 
 // Word-boundary patterns; each keyword counts once per message even if repeated.
-// "window"/"windows" deliberately does NOT match inside "window film" / "window tint"
-// (negative lookahead) so film jobs resolve to security_film instead of tying.
+// "window film" / "window tint" resolve to security_film (negative lookahead on
+// the bare-window pattern is unnecessary now that windows is out of scope, but
+// the film/tint signals are kept verbatim).
 const SERVICE_SIGNAL_PATTERNS: ServiceSignal[] = [
   { service: 'locksmith', keyword: 'deadbolt', pattern: /\bdeadbolts?\b/i },
   { service: 'locksmith', keyword: 'rekey', pattern: /\brekey\w*/i },
@@ -188,10 +191,6 @@ const SERVICE_SIGNAL_PATTERNS: ServiceSignal[] = [
   { service: 'locksmith', keyword: 'cylinder', pattern: /\bcylinders?\b/i },
   { service: 'locksmith', keyword: 'keyway', pattern: /\bkeyways?\b/i },
   { service: 'locksmith', keyword: 'lock', pattern: /\block\b/i },
-  { service: 'windows', keyword: 'window', pattern: /\bwindows?(?!\s+(film|tint))\b/i },
-  { service: 'windows', keyword: 'pane', pattern: /\bpanes?\b/i },
-  { service: 'windows', keyword: 'glass', pattern: /\bglass\b/i },
-  { service: 'windows', keyword: 'sealed unit', pattern: /\bsealed\s+unit\b/i },
   { service: 'doors', keyword: 'door', pattern: /\bdoors?\b/i },
   { service: 'doors', keyword: 'slab', pattern: /\bslabs?\b/i },
   { service: 'doors', keyword: 'pre-hung', pattern: /\bpre[-\s]?hung\b/i },
@@ -211,7 +210,7 @@ const SERVICE_SIGNAL_PATTERNS: ServiceSignal[] = [
 ];
 
 /**
- * Keyword-based guess at which of the 5 services a message is about.
+ * Keyword-based guess at which service a message is about.
  * Scores each service by distinct matched keywords; returns the strict winner.
  * Returns null when nothing matches, when scores tie (ambiguous), or when the
  * message is out of scope. Signals are the matched keywords for the winner.
@@ -243,4 +242,41 @@ export function classifyAssist(text: string): { service: AgentServiceKey | null;
   }
   if (best == null || tied) return { service: null, signals: [] };
   return { service: best, signals: byService.get(best) ?? [] };
+}
+
+/**
+ * Tech mistake-guard: validates that a "job complete" tap is backed by real
+ * field evidence (notes or photos recorded during the visit).
+ * (Moved verbatim from app/lib/agents/mistake-guard.ts.)
+ * Deterministic, no I/O.
+ *
+ * valid = true when at least one note or photo exists with at >= visitStartedAt
+ * (or any note/photo at all when visitStartedAt is null).
+ * Otherwise valid = false — the tap was likely accidental and the job must stay open.
+ * Events with unparseable timestamps are ignored.
+ */
+export function assessCompletion(opts: {
+  visitStartedAt: string | null;
+  noteEvents: CompletionEvent[];
+  photoFiles: CompletionEvent[];
+}): { valid: boolean; reason: string } {
+  const start = opts.visitStartedAt != null ? Date.parse(opts.visitStartedAt) : NaN;
+  const hasStart = Number.isFinite(start);
+
+  const relevant = [...opts.noteEvents, ...opts.photoFiles].filter(e => {
+    const t = Date.parse(e.at);
+    if (!Number.isFinite(t)) return false;
+    return hasStart ? t >= (start as number) : true;
+  });
+
+  if (relevant.length > 0) {
+    return {
+      valid: true,
+      reason: `Found ${relevant.length} note/photo record(s) recorded for this visit.`,
+    };
+  }
+  return {
+    valid: false,
+    reason: 'No notes or photos recorded for this visit — likely an accidental tap.',
+  };
 }

@@ -1,11 +1,16 @@
 import 'server-only';
-import { getTemplate, type LaborTierKey } from '../../../lib/service-templates';
-import { buildEstimate } from '../../../lib/estimate';
+import { getTemplate } from '../../../lib/service-templates';
+import {
+  buildAgentEstimateInput,
+  buildEstimate,
+  ASSESSMENT_FEE_CENTS,
+  type AgentPart,
+  type LaborTierKey,
+} from '@yavamo/core';
 import { verifyProduct } from '../../../lib/sourcing';
 import type { Product } from '../../../lib/domain';
 import { readBody } from '../../../lib/server';
 import { serviceDb, cronDenied } from '../lib';
-import { buildAgentEstimateInput, ASSESSMENT_FEE_CENTS, type AgentPart } from '../agent-libs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,7 +21,7 @@ export const runtime = 'nodejs';
  *
  * Builds a DRAFT quote (status 'draft', source 'agent') from tech assessment
  * notes: parts at supplier cost + margin via the deterministic buildEstimate
- * engine (see app/lib/agents/estimate-draft.ts). Never sends the quote to the
+ * engine (see packages/core/src/estimate.ts). Never sends the quote to the
  * client; the office review gate sends the approval link.
  *
  * Two jobs in one request (body.twoJobs === true, or body.jobCount > 1): the

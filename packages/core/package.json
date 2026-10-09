@@ -1,0 +1,13 @@
+{
+  "description": "Yavamo shared estimate/pricing engine \u2014 deterministic, framework-free TypeScript. Imported by the Next.js web app and the Expo mobile app.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "name": "@yavamo/core",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "types": "./src/index.ts",
+  "version": "0.1.0"
+}

@@ -3,8 +3,17 @@ import { useMemo, useState } from 'react';
 import { supabase } from '../../lib_supabase';
 import { AsyncButton, Icon, Modal, money } from '../../ui';
 import { serviceLabel, squareFeet } from '../../lib/domain';
-import { getTemplate, LABOR_TIERS, type LaborTierKey, type ServiceTemplate } from '../../lib/service-templates';
-import { buildEstimate, customerProjection, type ClientEstimate, type PricedLaborLine, type PricedMaterialLine } from '../../lib/estimate';
+import { getTemplate } from '../../lib/service-templates';
+import {
+  buildEstimate,
+  customerProjection,
+  LABOR_TIERS,
+  type ClientEstimate,
+  type LaborTierKey,
+  type PricedLaborLine,
+  type PricedMaterialLine,
+  type ServiceTemplate,
+} from '@yavamo/core';
 import { assistant } from '../../Composers';
 
 interface MaterialRow { id: string; name: string; quantity: number; unit: string; supplierCost: number | null; markupPct: number }

@@ -1,61 +1,21 @@
-// Deterministic estimate pricing engine.
+// @yavamo/core — deterministic estimate pricing engine + agent estimate builder.
 // NO React, NO AI, NO randomness, NO invented prices.
 // Every money value is rounded with roundMoney; every function is pure.
+//
+// Moved verbatim on 2026-10-09 from app/lib/estimate.ts (buildEstimate,
+// customerProjection) and app/lib/agents/estimate-draft.ts
+// (buildAgentEstimateInput). Behaviour is unchanged; only the module location
+// moved.
 
-import { roundMoney } from './domain';
-import { tierRate } from './service-templates';
-import type { LaborTierKey, ServiceTemplate } from './service-templates';
-
-export interface PricedMaterialLine {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  supplierCost: number | null;
-  markupPct: number;
-  unitPrice: number | null;
-  lineTotal: number | null;
-  lineCost: number | null;
-  marginPct: number | null;
-}
-
-export interface PricedLaborLine {
-  id: string;
-  name: string;
-  hours: number;
-  tierKey: LaborTierKey;
-  tierRate: number;
-  /** Client hourly price: tierRate / (1 - laborMarginPct/100) */
-  unitPrice: number;
-  lineTotal: number;
-  lineCost: number;
-  marginPct: number;
-}
-
-export interface EstimateResult {
-  materials: PricedMaterialLine[];
-  labor: PricedLaborLine[];
-  subtotal: number | null;
-  taxPct: number;
-  tax: number | null;
-  total: number | null;
-  depositPct: number;
-  deposit: number | null;
-  totalCost: number | null;
-  netMarginPct: number | null;
-  warnings: string[];
-  complete: boolean;
-}
-
-export interface EstimateInput {
-  template: ServiceTemplate;
-  materials: { id: string; name: string; quantity: number; unit: string; supplierCost: number | null; markupPct?: number }[];
-  labor: { id: string; name: string; hours: number; tierKey: LaborTierKey }[];
-  /** Per-estimate labor margin override (percent). Defaults to template.margin.laborMarginPct. */
-  laborMarginPct?: number;
-  taxPct?: number;
-  depositPct?: number;
-}
+import { roundMoney, tierRate, PART_MARGIN_DEFAULT_PCT, SHIPPING_FLAT } from './pricing';
+import type {
+  AgentEstimateOutput,
+  AgentPart,
+  ClientEstimate,
+  EstimateInput,
+  EstimateResult,
+  ServiceTemplate,
+} from './types';
 
 function sanitizeQty(n: unknown): number {
   const v = Number(n);
@@ -76,7 +36,7 @@ export function buildEstimate(input: EstimateInput): EstimateResult {
   const markupMax = template.margin.materialMarkupMax ?? 1000;
   const warnings: string[] = [];
 
-  const materials: PricedMaterialLine[] = input.materials.map(m => {
+  const materials = input.materials.map(m => {
     const quantity = sanitizeQty(m.quantity);
     const supplierCost = sanitizeCost(m.supplierCost);
     const requestedMarkup = Number.isFinite(Number(m.markupPct)) ? Number(m.markupPct) : template.margin.materialMarkupPct;
@@ -94,7 +54,7 @@ export function buildEstimate(input: EstimateInput): EstimateResult {
     return { id: m.id, name: m.name, quantity, unit: m.unit, supplierCost, markupPct, unitPrice, lineTotal, lineCost, marginPct };
   });
 
-  const labor: PricedLaborLine[] = input.labor.map(l => {
+  const labor = input.labor.map(l => {
     const hours = sanitizeQty(l.hours);
     const rate = tierRate(l.tierKey);
     // effectiveRate = tierRate / (1 - laborMarginPct/100)
@@ -144,23 +104,6 @@ export function buildEstimate(input: EstimateInput): EstimateResult {
   return { materials, labor, subtotal, taxPct, tax, total, depositPct, deposit, totalCost, netMarginPct, warnings, complete };
 }
 
-/** Client-safe line shapes — supplier cost, line cost, margin and markup are stripped. */
-export interface ClientMaterialLine { name: string; quantity: number; unit: string; unitPrice: number; lineTotal: number }
-export interface ClientLaborLine { name: string; hours: number; tierKey: LaborTierKey; unitPrice: number; lineTotal: number }
-export interface ClientEstimate {
-  materials: ClientMaterialLine[];
-  labor: ClientLaborLine[];
-  subtotal: number | null;
-  taxPct: number;
-  tax: number | null;
-  total: number | null;
-  depositPct: number;
-  deposit: number | null;
-  validDays?: number;
-  complete: boolean;
-  warnings: string[];
-}
-
 /**
  * Strip every internal field (supplierCost, lineCost, totalCost, marginPct, markupPct)
  * plus internal-only warnings (net margin guardrail). The client preview MUST render
@@ -181,4 +124,78 @@ export function customerProjection(r: EstimateResult): ClientEstimate {
     complete: r.complete,
     warnings: r.warnings.filter(w => !w.startsWith('Net margin')),
   };
+}
+
+/**
+ * Build an EstimateInput from agent-sourced parts.
+ * (Moved verbatim from app/lib/agents/estimate-draft.ts.)
+ *
+ * - Materials: each part at `marginPct` (default 20%). Aftermarket parts get
+ *   " (aftermarket — needs office decision)" appended to the name and a flag.
+ *   Unpriced parts (supplierCost null) are kept as unpriced lines and flagged.
+ * - Labour: exactly ONE flat line of 1 hour at the given tier with
+ *   laborMarginPct 0, so the client price is exactly the tier rate
+ *   ($180 priority / $220 emergency). Per Lavie (2026-10-08): even when one
+ *   request contains two distinct jobs, labour stays $180 x 1 — only the
+ *   assessment fee doubles ($138), which is recorded on the job, not here.
+ *   The `jobCount` option is retained for compatibility but no longer
+ *   multiplies labour lines.
+ * - Shipping: one flat $20 line, 0% markup.
+ */
+export function buildAgentEstimateInput(opts: {
+  template: ServiceTemplate;
+  parts: AgentPart[];
+  tierKey: 'priority' | 'emergency';
+  /** Retained for compatibility; does NOT multiply labour (always 1 line). */
+  jobCount?: number;
+  marginPct?: number;
+}): AgentEstimateOutput {
+  const marginPct = opts.marginPct ?? PART_MARGIN_DEFAULT_PCT;
+  const flags: string[] = [];
+
+  const materials: EstimateInput['materials'] = opts.parts.map((p, i) => {
+    const aftermarket = p.aftermarket === true;
+    if (aftermarket) {
+      flags.push(`Aftermarket part: "${p.name}" — needs office decision before ordering.`);
+    }
+    if (p.supplierCost == null) {
+      flags.push(`Unpriced part: "${p.name}" — no supplier price found; needs office decision.`);
+    }
+    return {
+      id: `agent-part-${i + 1}`,
+      name: aftermarket ? `${p.name} (aftermarket — needs office decision)` : p.name,
+      quantity: p.quantity ?? 1,
+      unit: p.unit ?? 'each',
+      supplierCost: p.supplierCost,
+      markupPct: marginPct,
+    };
+  });
+
+  materials.push({
+    id: 'shipping',
+    name: 'Flat shipping',
+    quantity: 1,
+    unit: 'flat',
+    supplierCost: SHIPPING_FLAT,
+    markupPct: 0,
+  });
+
+  const labor: EstimateInput['labor'] = [{
+    id: 'agent-labor-1',
+    name: 'Labour',
+    hours: 1,
+    tierKey: opts.tierKey,
+  }];
+
+  const input: EstimateInput = {
+    template: opts.template,
+    materials,
+    labor,
+    // 0% labour margin: client price = exactly the flat tier rate (180 / 220).
+    laborMarginPct: 0,
+    taxPct: 13,
+    depositPct: 50,
+  };
+
+  return { input, flags };
 }
