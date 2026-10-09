@@ -76,39 +76,39 @@ alter table public.notifications enable row level security;
 
 do $$ begin
   create policy "members can read agent runs" on public.agent_runs
-    for select to authenticated using (is_org_member(organization_id));
+    for select to authenticated using (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can write agent runs" on public.agent_runs
-    for all to authenticated using (is_org_member(organization_id))
-    with check (is_org_member(organization_id));
+    for all to authenticated using (private.is_org_member(organization_id))
+    with check (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can read email intake log" on public.email_intake_log
-    for select to authenticated using (is_org_member(organization_id));
+    for select to authenticated using (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can write email intake log" on public.email_intake_log
-    for all to authenticated using (is_org_member(organization_id))
-    with check (is_org_member(organization_id));
+    for all to authenticated using (private.is_org_member(organization_id))
+    with check (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can read part tracking" on public.part_tracking
-    for select to authenticated using (is_org_member(organization_id));
+    for select to authenticated using (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can write part tracking" on public.part_tracking
-    for all to authenticated using (is_org_member(organization_id))
-    with check (is_org_member(organization_id));
+    for all to authenticated using (private.is_org_member(organization_id))
+    with check (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can read notifications" on public.notifications
-    for select to authenticated using (is_org_member(organization_id));
+    for select to authenticated using (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
   create policy "members can write notifications" on public.notifications
-    for all to authenticated using (is_org_member(organization_id))
-    with check (is_org_member(organization_id));
+    for all to authenticated using (private.is_org_member(organization_id))
+    with check (private.is_org_member(organization_id));
 exception when duplicate_object then null; end $$;
 
 create index if not exists agent_runs_org_agent_idx
