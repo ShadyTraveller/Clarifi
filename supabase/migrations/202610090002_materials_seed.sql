@@ -1,6 +1,6 @@
 -- Yavamo supplier_materials seed — INTERNAL COST BASIS ONLY (never client-visible).
 -- Generated 2026-10-08 from observed public CAD prices
--- (Home Depot Canada, Canadian Tire, Amazon Canada, Walmart Canada).
+-- (Home Depot Canada, Canadian Tire, Amazon CA, Walmart CA).
 -- Idempotent: re-runs converge via the unique index + ON CONFLICT DO NOTHING.
 
 create unique index if not exists supplier_materials_org_retailer_sku_uidx
@@ -69,47 +69,47 @@ begin
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Gila XTREME LIMO BLACK Window Tint, Maximum Privacy, 2.5% VLT (6.5'' x 24" roll)', 'Gila', 3599, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-scratch-resistant-xtreme-limo-window-tint-midnight-black-0411947p.html', '0411947P', 'roll', NULL)
+    values (org, 'security-film', 'Gila XTREME LIMO BLACK Window Tint, Maximum Privacy, 2.5% VLT (6.5'' x 24" roll)', 'Gila', 3599, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-scratch-resistant-xtreme-limo-window-tint-midnight-black-0411947p.html', '0411947P', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Gila HEAT SHIELD Automotive Window Tint, Scratch-Resistant, 5% VLT (6.5'' x 24" roll)', 'Gila', 2899, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-basic-heat-shield-automotive-window-tint-0411937p.0411937.html?rq=adhesive+tint', 'NRS42', 'roll', NULL)
+    values (org, 'security-film', 'Gila HEAT SHIELD Automotive Window Tint, Scratch-Resistant, 5% VLT (6.5'' x 24" roll)', 'Gila', 2899, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-basic-heat-shield-automotive-window-tint-0411937p.0411937.html?rq=adhesive+tint', 'NRS42', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Gila Window Film Application Solution, 473-mL', 'Gila', 1699, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-window-film-application-solution-473-ml-0419328p.html', 'FS200C', 'each', NULL)
+    values (org, 'security-film', 'Gila Window Film Application Solution, 473-mL', 'Gila', 1699, 'CAD', 'Canadian Tire', 'https://www.canadiantire.ca/en/pdp/gila-window-film-application-solution-473-ml-0419328p.html', 'FS200C', 'each', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Type S Decorative Wrap Film Deluxe Installation Kit (4 custom tools + felt-edge squeegee)', 'Type S', 1499, 'CAD', 'Canadian Tire', 'http://www.canadiantire.ca/en/pdp/decorative-wrap-film-deluxe-installation-kit-1410574p.html', 'AC31476F60/6', 'each', NULL)
+    values (org, 'security-film', 'Type S Decorative Wrap Film Deluxe Installation Kit (4 custom tools + felt-edge squeegee)', 'Type S', 1499, 'CAD', 'Canadian Tire', 'http://www.canadiantire.ca/en/pdp/decorative-wrap-film-deluxe-installation-kit-1410574p.html', 'AC31476F60/6', 'each', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Coavas Reflective One Way Window Film, Silver Black (17.5 x 78.7 in / 44.5 x 200 cm)', 'Coavas', 1019, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0CP3LH63L/ref=cm_sw_r_cso_fb_apan_dp_Z9K15716M6Q99FKBEBRB', 'B0CP3LH63L', 'roll', NULL)
+    values (org, 'security-film', 'Coavas Reflective One Way Window Film, Silver Black (17.5 x 78.7 in / 44.5 x 200 cm)', 'Coavas', 1019, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0CP3LH63L/ref=cm_sw_r_cso_fb_apan_dp_Z9K15716M6Q99FKBEBRB', 'B0CP3LH63L', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'One Way Window Privacy Film, PET Explosion-Proof, Silver (29.5" x 157.5")', 'LULUETPUE', 4399, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0BQW6WJC9/ref=cm_sw_r_cso_fm_mwn_dp_RC64EZ8CAYC85GYHG2PR', 'B0BQW6WJC9', 'roll', NULL)
+    values (org, 'security-film', 'One Way Window Privacy Film, PET Explosion-Proof, Silver (29.5" x 157.5")', 'LULUETPUE', 4399, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0BQW6WJC9/ref=cm_sw_r_cso_fm_mwn_dp_RC64EZ8CAYC85GYHG2PR', 'B0BQW6WJC9', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'One Way Window Privacy Film, Reflective Sun Heat Blocking, Silver Black (23.6" x 78.7")', 'LULUETPUE', 2674, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0DSB2YYSX/ref=cm_sw_r_cso_cp_apin_dp_XP2WB4344Y4XV31S5GEF', 'B0DSB2YYSX', 'roll', NULL)
+    values (org, 'security-film', 'One Way Window Privacy Film, Reflective Sun Heat Blocking, Silver Black (23.6" x 78.7")', 'LULUETPUE', 2674, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B0DSB2YYSX/ref=cm_sw_r_cso_cp_apin_dp_XP2WB4344Y4XV31S5GEF', 'B0DSB2YYSX', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'Dvkptbk Reflective Window Film, Heat Control Self-Adhesive (30 x 200 cm / 11.81 x 78.74 in)', 'Dvkptbk', 1240, 'CAD', 'Walmart Canada', 'https://www.walmart.ca/en/ip/Dvkptbk-Window-Privacys-Film-Reflective-Window-Film-Heat-Control-Window-Tint-Self-Adhesive-Daytime-Window-Tint-Film-for-Home-And-Office/60BL5DGDPIW0', '60BL5DGDPIW0', 'roll', NULL)
+    values (org, 'security-film', 'Dvkptbk Reflective Window Film, Heat Control Self-Adhesive (30 x 200 cm / 11.81 x 78.74 in)', 'Dvkptbk', 1240, 'CAD', 'Walmart Canada', 'https://www.walmart.ca/en/ip/Dvkptbk-Window-Privacys-Film-Reflective-Window-Film-Heat-Control-Window-Tint-Self-Adhesive-Daytime-Window-Tint-Film-for-Home-And-Office/60BL5DGDPIW0', '60BL5DGDPIW0', 'roll', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
       (organization_id, service, name, brand, public_price_cents, currency, retailer, source_url, sku, unit, notes)
-    values (org, 'security_film', 'EHDIS 7-Piece Window Tint Tool Kit (squeegees, felt scraper, film cutter + 10 snap-off blades)', 'EHDIS', 1899, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B01J3QVS2K/ref=cm_sw_r_cso_fm_mwn_dp_XP2WB4344Y4XV31S5GEF', 'B01J3QVS2K', 'each', NULL)
+    values (org, 'security-film', 'EHDIS 7-Piece Window Tint Tool Kit (squeegees, felt scraper, film cutter + 10 snap-off blades)', 'EHDIS', 1899, 'CAD', 'Amazon Canada', 'https://www.amazon.ca/dp/B01J3QVS2K/ref=cm_sw_r_cso_fm_mwn_dp_XP2WB4344Y4XV31S5GEF', 'B01J3QVS2K', 'each', NULL)
     on conflict (organization_id, retailer, coalesce(sku, ''), coalesce(source_url, '')) do nothing;
 
     insert into public.supplier_materials
