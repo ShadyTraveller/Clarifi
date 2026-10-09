@@ -1,4 +1,5 @@
 -- Yavamo AI agents backend (receptionist + warehouse).
+-- Ops note (2026-10-08): apply this file in the Supabase SQL editor, then set CRON_SECRET in Vercel (done) — agent routes authenticate once both are in place.
 -- New tables: agent_runs, email_intake_log, part_tracking, notifications.
 -- Column additions on jobs and quotes for the assessment-fee flow and the
 -- tech-marks-complete mistake-guard. Service role (server routes) bypasses
