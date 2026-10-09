@@ -33,9 +33,10 @@ Gmail draft for the office to review and send.
 | Office email (reports go here) | **ainearby@gmail.com** |
 
 Business rules that never change:
-- **Services in scope:** residential/commercial windows, doors, security film
-  application, locksmithing (rekey / lock change **only**, no cars),
-  private skincare treatment.
+- **Services in scope:** doors, security film application, locksmithing
+  (rekey / lock change **only**, no cars), and private skincare treatment
+  (red light therapy devices only). Windows are OUT OF SCOPE for now — treat
+  window inquiries as out-of-scope (polite decline).
 - **Out of scope:** access control systems, key fobs, ignition work, small
   appliances (toasters, air fryers, etc.).
 - **Assessment fee:** **$69**. Tenant/landlord → **collect BEFORE the visit**
@@ -203,7 +204,7 @@ to notes. If none → treat as new and note the ambiguity in the summary.
      commercial (infer only when stated; default `other` and note it)
    - direct phone (with extension, as-is) · email
    - property address · unit # · gate code · COI request (yes/no + details)
-   - service type (windows / doors / security film / locksmithing / skincare)
+   - service type (doors / security film / locksmithing / skincare)
    - job description (verbatim, keep photos mentioned but don't fetch them)
 2. **Create the Request record** = a `jobs` row with `status='lead'` (pipeline:
    Lead → Estimate → Job → Completed), `service` set, `details` containing all
@@ -324,16 +325,13 @@ could you please send:
 2. <SERVICE-SPECIFIC QUESTIONS — pick the matching block below>
 
 Once we have those, our office will prepare your estimate and get back to
-you. If this is urgent (lockout, broken window/door), please call us directly.
+you. If this is urgent (lockout, broken door/lock), please call us directly.
 
 — Yavamo
 ```
 
 **Per-service question inserts** (`SERVICE_QUESTIONS` in `classify.ts`):
 
-- **Windows:** What type of window (sliding, casement, double-hung)? Rough
-  measurements (width × height)? Is the glass cracked, foggy, or is the frame
-  damaged? Ground floor or upper floor?
 - **Doors:** Interior or exterior door? What needs doing — new install, repair,
   or replacement? Rough measurements of the door slab? Is the frame damaged?
 - **Security film:** Residential or commercial property? How many windows, and
@@ -356,7 +354,7 @@ Thanks for contacting Yavamo — we've received your message. Our office hours
 are Monday to Friday, 9 AM–5 PM (Toronto time), and we'll respond in the
 morning.
 
-If this is urgent (lockout, broken window/door), please call us directly.
+If this is urgent (lockout, broken door/lock), please call us directly.
 
 — Yavamo
 ```
@@ -371,8 +369,8 @@ Hi {name},
 Thanks for thinking of Yavamo. Unfortunately we don't have anyone available
 at this time for {reason} — it's outside the services we offer.
 
-Our services: windows, doors, security film, locksmithing (rekey/lock change
-— no cars), and private skincare treatments.
+Our services: doors, security film, locksmithing (rekey/lock change
+— no cars), and private skincare treatments (red light therapy).
 
 Wishing you luck finding the right help.
 
