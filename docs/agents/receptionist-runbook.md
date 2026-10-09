@@ -206,10 +206,13 @@ to notes. If none → treat as new and note the ambiguity in the summary.
    - property address · unit # · gate code · COI request (yes/no + details)
    - service type (doors / security film / locksmithing / skincare)
    - job description (verbatim, keep photos mentioned but don't fetch them)
-2. **Create the Request record** = a `jobs` row with `status='lead'` (pipeline:
-   Lead → Estimate → Job → Completed), `service` set, `details` containing all
-   extracted fields verbatim + `Source: Gmail`. Use the same RPC / direct-insert
-   path as Step 5.
+2. **Create the Request record** via `POST https://www.yavamo.ca/api/agents/requests`
+   with `{organization_id, service, full_name, role, phone, email, address,
+   unit_number, gate_code, coi_request, request_title, details, two_jobs}` and
+   the bearer header. The route find-or-creates the client and inserts the
+   `jobs` row with `status='lead'` (pipeline: Lead → Estimate → Job →
+   Completed). It returns `{job_id}` — save it for step 8. (There is no
+   direct-DB path from the worker; always use this route.)
 3. **Assessment-fee flags:**
    - role = tenant or landlord → set the job's assessment flag:
      **`assessment fee $69 — collect before visit`** (office collects manually;
