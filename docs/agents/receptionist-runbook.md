@@ -228,6 +228,16 @@ to notes. If none → treat as new and note the ambiguity in the summary.
 6. **Do not schedule appointments.** Scheduling stays manual; the draft reply
    for requests says the office will confirm a time.
 7. Log the message id in `email_intake_log`.
+8. **Auto-draft the estimate (Billdr-style automatic estimates):** immediately
+   call `POST https://www.yavamo.ca/api/agents/estimate-auto` with
+   `{organization_id, job_id}` and the bearer header. The route picks the
+   active template for the job's service, has AI match catalog parts, and
+   creates the quote as **draft** (`source='agent'`) — office review stays
+   mandatory, nothing is ever sent to the client. If the response lists
+   `needs_review` flags, include them verbatim in your run summary so the
+   office knows what needs a human pick. Skip this step for out-of-scope
+   declines and for follow-ups on existing threads (no new request = no new
+   estimate).
 
 ### Step 7 — Act on OUT_OF_SCOPE + after-hours drafts
 
