@@ -60,3 +60,100 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Jobs could not be listed.' }, { status: 500 });
   }
 }
+
+/**
+ * Receptionist/office → DELETE /api/agents/jobs?organization_id=...&job_id=...
+ * Auth: Authorization: Bearer <CRON_SECRET>.
+ *
+ * Removes a junk/test job and its draft estimates. Safety rules:
+ * - 404 if the job does not belong to the organization.
+ * - 409 if the job has any invoices (never delete billed work).
+ * - 409 if the job status is 'completed' (history must be preserved).
+ * - Cascades: quote_line_items → quote_versions → quotes → job_events → job.
+ * - Does NOT delete the client (use the client delete when it exists).
+ *
+ * Never sends anything. Returns { ok, deleted: { quotes, versions, items, events } }.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const denied = cronDenied(request);
+    if (denied) return denied;
+
+    const url = new URL(request.url);
+    const organization_id = url.searchParams.get('organization_id') || '';
+    const job_id = url.searchParams.get('job_id') || '';
+    if (!organization_id || !job_id) {
+      return Response.json({ error: 'organization_id and job_id are required.' }, { status: 400 });
+    }
+
+    const db = serviceDb();
+    const { data: job, error: jobError } = await db
+      .from('jobs')
+      .select('id, status')
+      .eq('id', job_id)
+      .eq('organization_id', organization_id)
+      .maybeSingle();
+    if (jobError || !job) {
+      return Response.json({ error: 'Job not found.' }, { status: 404 });
+    }
+    if (job.status === 'completed') {
+      return Response.json({ error: 'Completed jobs cannot be deleted (history).' }, { status: 409 });
+    }
+
+    const { count: invoiceCount } = await db
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organization_id)
+      .eq('job_id', job.id);
+    if ((invoiceCount || 0) > 0) {
+      return Response.json({ error: 'Jobs with invoices cannot be deleted.' }, { status: 409 });
+    }
+
+    const { data: quotes } = await db
+      .from('quotes')
+      .select('id')
+      .eq('organization_id', organization_id)
+      .eq('job_id', job.id);
+    const quoteIds = (quotes || []).map(q => q.id as string);
+
+    let versions = 0;
+    let items = 0;
+    if (quoteIds.length > 0) {
+      const { data: vers } = await db
+        .from('quote_versions')
+        .select('id')
+        .in('quote_id', quoteIds);
+      const versionIds = (vers || []).map(v => v.id as string);
+      versions = versionIds.length;
+      if (versionIds.length > 0) {
+        const { count } = await db
+          .from('quote_line_items')
+          .delete({ count: 'exact' })
+          .in('quote_version_id', versionIds);
+        items = count || 0;
+        await db.from('quote_versions').delete().in('id', versionIds);
+      }
+      await db.from('quotes').delete().in('id', quoteIds);
+    }
+
+    const { count: events } = await db
+      .from('job_events')
+      .delete({ count: 'exact' })
+      .eq('organization_id', organization_id)
+      .eq('job_id', job.id);
+
+    await db.from('jobs').delete().eq('id', job.id);
+
+    return Response.json({
+      ok: true,
+      deleted: {
+        quotes: quoteIds.length,
+        versions,
+        items,
+        events: events || 0,
+      },
+    });
+  } catch (error) {
+    return Response.json({ error: 'The job could not be deleted.' }, { status: 500 });
+  }
+}

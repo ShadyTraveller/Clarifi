@@ -208,8 +208,10 @@ to notes. If none → treat as new and note the ambiguity in the summary.
    - job description (verbatim, keep photos mentioned but don't fetch them)
 2. **Create the Request record** via `POST https://www.yavamo.ca/api/agents/requests`
    with `{organization_id, service, full_name, role, phone, email, address,
-   unit_number, gate_code, coi_request, request_title, details, two_jobs}` and
-   the bearer header. The route find-or-creates the client and inserts the
+   unit_number, gate_code, coi_request, request_title, details, two_jobs,
+   source_ref}` and the bearer header. Always set
+   `source_ref` to `gmail:<message_id>` — the route returns the existing job
+   (`duplicate: true`) if the same email is ever processed twice. The route find-or-creates the client and inserts the
    `jobs` row with `status='lead'` (pipeline: Lead → Estimate → Job →
    Completed). It returns `{job_id}` — save it for step 8. (There is no
    direct-DB path from the worker; always use this route.)

@@ -15,7 +15,13 @@ export const runtime = 'nodejs';
  *
  * Body: { organization_id, service, full_name?, role?, phone?, email?,
  *   address?, unit_number?, gate_code?, coi_request?, request_title?,
- *   details?, two_jobs? }
+ *   details?, two_jobs?, source_ref? }
+ *
+ * Dedupe: when source_ref is provided (e.g. 'gmail:<message_id>'), an
+ * existing job with the same organization_id + source_ref is returned
+ * instead of creating a duplicate. Without source_ref, a lead-stage job
+ * for the same client + service created in the last 24h is treated as
+ * the same request.
  * - service must be one of: doors | security-film | locksmith | skincare.
  * - role: tenant | landlord | owner | property_management | institution |
  *   commercial | other (stored in notes; tenant/landlord flips the
@@ -62,6 +68,7 @@ export async function POST(request: Request) {
     const gate_code = clean(body.gate_code, 60);
     const coi_request = clean(body.coi_request, 500);
     const two_jobs = body.two_jobs === true;
+    const source_ref = clean(body.source_ref, 200);
 
     if (!full_name && !phone && !email && !detailsRaw) {
       return Response.json({ error: 'At least a name, phone, email or details is required.' }, { status: 400 });
@@ -135,6 +142,45 @@ export async function POST(request: Request) {
     const assessment_fee_cents = two_jobs ? 13800 : 6900;
     const assessment_fee_status = role === 'tenant' || role === 'landlord' ? 'collect_before_visit' : 'pending';
 
+    // Dedupe: exact key first, then same-client+service+recent-lead fallback.
+    if (source_ref) {
+      const { data: existing } = await db
+        .from('jobs')
+        .select('id')
+        .eq('organization_id', organization_id)
+        .eq('source_ref', source_ref)
+        .maybeSingle();
+      if (existing) {
+        return Response.json({
+          ok: true,
+          client_id,
+          job_id: existing.id,
+          duplicate: true,
+        });
+      }
+    } else {
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recent } = await db
+        .from('jobs')
+        .select('id')
+        .eq('organization_id', organization_id)
+        .eq('client_id', client_id)
+        .eq('service', service)
+        .eq('status', 'lead')
+        .gte('created_at', dayAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recent) {
+        return Response.json({
+          ok: true,
+          client_id,
+          job_id: recent.id,
+          duplicate: true,
+        });
+      }
+    }
+
     const { data: job, error: jobError } = await db
       .from('jobs')
       .insert({
@@ -146,6 +192,7 @@ export async function POST(request: Request) {
         service,
         assessment_fee_cents,
         assessment_fee_status,
+        source_ref,
       })
       .select('id')
       .single();
