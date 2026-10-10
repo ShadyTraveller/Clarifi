@@ -155,7 +155,7 @@ export async function validateIntake(opts: {
  */
 export function validationFlags(v: IntakeValidation): string[] {
   const flags: string[] = [];
-  if (v.email.checked && v.email.valid === false) {
+  if (v.email.checked && (v.email.valid === false || v.email.verdict === 'risky')) {
     flags.push(
       v.email.suggestion
         ? `Email looks wrong — did you mean ${v.email.suggestion}?`
