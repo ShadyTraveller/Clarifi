@@ -145,24 +145,49 @@ export async function POST(request: Request) {
       const safeRole = ENUM_SAFE_ROLES.has(mapped.role) ? mapped.role : 'other';
       const downgradeNote =
         safeRole === mapped.role ? '' : `Client type from form: ${mapped.roleRaw || mapped.role} (recorded as ${safeRole}).\n`;
-      const { data: client, error: clientError } = await db
-        .from('clients')
-        .insert({
-          organization_id: orgId,
-          name: clientInfo.name,
-          email: clientInfo.email,
-          phone: clientInfo.phone,
-          address: clientInfo.address,
-          relationship: safeRole,
-        })
-        .select('id')
-        .single();
-      if (clientError) throw clientError;
+      // Dedupe: reuse existing client by email or phone digits.
+      const emailNorm = (clientInfo.email || '').toLowerCase().trim();
+      const phoneDigits = (clientInfo.phone || '').replace(/\D/g, '');
+      let clientId: string | null = null;
+      if (emailNorm || phoneDigits) {
+        const { data: existing } = await db
+          .from('clients')
+          .select('id')
+          .eq('organization_id', orgId)
+          .or(
+            [
+              emailNorm ? `email.ilike.${emailNorm}` : '',
+              phoneDigits ? `phone.ilike.%${phoneDigits}%` : '',
+            ]
+              .filter(Boolean)
+              .join(',')
+          )
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        clientId = existing?.id || null;
+      }
+      if (!clientId) {
+        const { data: client, error: clientError } = await db
+          .from('clients')
+          .insert({
+            organization_id: orgId,
+            name: clientInfo.name,
+            email: clientInfo.email,
+            phone: clientInfo.phone,
+            address: clientInfo.address,
+            relationship: safeRole,
+          })
+          .select('id')
+          .single();
+        if (clientError) throw clientError;
+        clientId = client.id;
+      }
       const { data: job, error: jobError } = await db
         .from('jobs')
         .insert({
           organization_id: orgId,
-          client_id: client.id,
+          client_id: clientId,
           request: mapped.title,
           details: downgradeNote + mapped.details,
           status: 'lead',
