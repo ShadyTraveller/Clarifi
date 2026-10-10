@@ -101,10 +101,9 @@ async function pickMaterial(opts: {
   lineLabel: string;
   templateQty: number;
   candidates: Material[];
-}): Promise<{ pick: PickResult | null; reason: string }> {
+}): Promise<PickResult | null> {
   const apiKey = process.env.OPENAI_API_KEY || '';
-  if (!apiKey) return { pick: null, reason: 'no OPENAI_API_KEY in runtime env' };
-  if (opts.candidates.length === 0) return { pick: null, reason: 'zero candidates for service' };
+  if (!apiKey || opts.candidates.length === 0) return null;
 
   const candidateLines = opts.candidates.map(
     m =>
@@ -138,16 +137,15 @@ async function pickMaterial(opts: {
     });
     const text = completion.choices?.[0]?.message?.content ?? '';
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return { pick: null, reason: 'no JSON object in model response' };
+    if (!match) return null;
     const parsed = JSON.parse(match[0]) as { material_id?: unknown; quantity?: unknown };
     const ids = new Set(opts.candidates.map(c => c.id));
     const material_id =
       typeof parsed.material_id === 'string' && ids.has(parsed.material_id) ? parsed.material_id : null;
     const quantity = sanitizeQty(parsed.quantity, 1);
-    return { pick: { material_id, quantity: Math.min(quantity, 100) }, reason: 'ok' };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { pick: null, reason: 'openai call failed: ' + msg.slice(0, 220) };
+    return { material_id, quantity: Math.min(quantity, 100) };
+  } catch {
+    return null;
   }
 }
 
@@ -213,8 +211,6 @@ export async function POST(request: Request) {
 
     const jobText = `${String(job.request || '')}\n${String(job.details || '')}`.trim() || '(no details provided)';
 
-    const debug = body.debug === true;
-    const debugPicks: { line: string; reason: string }[] = [];
     const needs_review: string[] = [];
     const internalRefs: string[] = [];
     const items: {
@@ -240,16 +236,15 @@ export async function POST(request: Request) {
           line.material_id != null ? materials.find(m => m.id === line.material_id) || null : null;
         let qty = quantity;
         if (!material && line.material_id == null) {
-          const pres = await pickMaterial({
+          const pick = await pickMaterial({
             jobText,
             lineLabel: line.label,
             templateQty: quantity,
             candidates: materials,
           });
-          if (debug) debugPicks.push({ line: cleanLabel(line.label), reason: pres.reason });
-          if (pres.pick?.material_id) {
-            material = materials.find(m => m.id === pres.pick.material_id) || null;
-            qty = pres.pick.quantity;
+          if (pick?.material_id) {
+            material = materials.find(m => m.id === pick.material_id) || null;
+            qty = pick.quantity;
           }
         }
 
@@ -358,16 +353,6 @@ export async function POST(request: Request) {
       version_id: version.id,
       lines: items.length,
       needs_review,
-      ...(debug
-        ? {
-            _debug: {
-              service,
-              materials_found: materials.length,
-              has_openai_key: !!process.env.OPENAI_API_KEY,
-              picks: debugPicks,
-            },
-          }
-        : {}),
     });
   } catch (error) {
     return Response.json({ error: 'The automatic estimate could not be created.' }, { status: 500 });
