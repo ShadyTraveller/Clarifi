@@ -138,7 +138,7 @@ async function pickMaterial(opts: {
     });
     const text = completion.choices?.[0]?.message?.content ?? '';
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    if (!match) return { pick: null, reason: 'no JSON object in model response' };
     const parsed = JSON.parse(match[0]) as { material_id?: unknown; quantity?: unknown };
     const ids = new Set(opts.candidates.map(c => c.id));
     const material_id =
