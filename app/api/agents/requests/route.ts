@@ -1,6 +1,7 @@
 import 'server-only';
 import { readBody } from '../../../lib/server';
 import { serviceDb, cronDenied } from '../lib';
+import { validateIntake, validationFlags } from '../../../lib/agents/validate-intake';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -180,6 +181,10 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    // Intake validation: flag suspicious contact data (never blocks).
+    const validation = await validateIntake({ email, phone, address });
+    const flags = validationFlags(validation);
 
     // Optional columns (source_ref, validation) — gracefully skip if their
     // migrations haven't been applied yet.
