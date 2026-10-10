@@ -1,5 +1,4 @@
 import 'server-only';
-import OpenAI from 'openai';
 import { roundMoney, PART_MARGIN_DEFAULT_PCT } from '@yavamo/core';
 import { readBody } from '../../../lib/server';
 import { serviceDb, cronDenied } from '../lib';
@@ -22,11 +21,11 @@ export const runtime = 'nodejs';
  *   labour / shipping / fee → flat pricing_rule.amount_cents / 100, markup 0
  *   total    → unit_price * quantity (every kind)
  *
- * Part lines with material_id NULL ("pick from catalog") are resolved by
- * gpt-4o-mini against supplier_materials for the service. The model may only
+ * Part lines with material_id NULL ("pick from catalog") are resolved by a
+ * deterministic keyword matcher against supplier_materials for the service. The matcher may only
  * return ids from the provided candidate list — never invented products. Any
- * line it cannot resolve (or when OpenAI is unavailable) is kept as an
- * unpriced line and flagged in needs_review for the office.
+ * line it cannot resolve is kept as an unpriced line and flagged in
+ * needs_review for the office.
  *
  * INTERNAL-ONLY: unit_cost, markup_percent and supplier source URLs stay in
  * DB columns the client views never read. The client quote page renders
@@ -92,61 +91,96 @@ function sanitizeQty(n: unknown, fallback: number): number {
 }
 
 /**
- * Ask gpt-4o-mini to pick the single best catalog product for a template part
- * line. Returns null on ANY failure (no key, network error, bad JSON, id not
- * in the candidate list) — the caller then flags the line for office pick.
+ * Deterministic catalog matcher: picks the best product for a template part
+ * line using keyword overlap (IDF-weighted) between the line label + job text
+ * and each candidate's name/brand. No network calls, no API keys, no cost.
+ *
+ * - Label keywords weigh 2x (they define what's needed); job keywords 0.5x.
+ * - Rare words (e.g. "rekey", "squeegee") weigh more than common ones ("door").
+ * - Concept tags map domain terms to catalog vocabulary
+ *   (e.g. "security" <-> "explosion-proof").
+ * - Near-ties break by lowest price (deterministic); anything below the
+ *   confidence threshold returns null so the office picks it.
  */
-async function pickMaterial(opts: {
+const MATCH_STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'for', 'to', 'of', 'on', 'in', 'with',
+  'is', 'are', 'was', 'were', 'be', 'been', 'it', 'its', 'this', 'that',
+  'i', 'we', 'you', 'he', 'she', 'they', 'my', 'our', 'your', 'his', 'her',
+  'their', 'me', 'us', 'him', 'them', 'at', 'by', 'from', 'as',
+  'how', 'much', 'need', 'needs', 'needed', 'want', 'wants', 'wanted',
+  'please', 'hi', 'hello', 'thanks', 'thank', 'just', 'like', 'new',
+]);
+const MATCH_GENERIC = new Set(['set', 'kit', 'pack', 'pair']);
+const MATCH_CONCEPTS: Array<{ concept: string[]; triggers: string[] }> = [
+  {
+    concept: ['security'],
+    triggers: [
+      'explosion-proof', 'explosionproof', 'shatterproof',
+      'shatter-proof', 'safety', 'protective', '8mil', '12mil',
+    ],
+  },
+  { concept: ['squeegee'], triggers: ['squeegee', 'squeegees'] },
+];
+const MATCH_THRESHOLD = 6.0;
+
+function matchStem(w: string): string {
+  for (const suf of ['ing', 'ies', 'es', 'ed', 's']) {
+    if (w.length > suf.length + 2 && w.endsWith(suf)) {
+      return suf === 'ies' ? w.slice(0, -3) + 'y' : w.slice(0, -suf.length);
+    }
+  }
+  return w;
+}
+
+function matchTokens(text: string): string[] {
+  const words = text.toLowerCase().match(/[a-z0-9]+/g) || [];
+  return words.map(matchStem).filter(w => !MATCH_STOPWORDS.has(w) && w.length > 1);
+}
+
+function matchCandidateTokens(c: Material): Set<string> {
+  const toks = new Set(matchTokens(`${c.name} ${c.brand || ''}`));
+  for (const { concept, triggers } of MATCH_CONCEPTS) {
+    for (const trig of triggers) {
+      const trigToks = matchTokens(trig);
+      if (trigToks.length > 0 && trigToks.every(t => toks.has(t))) {
+        concept.forEach(t => toks.add(t));
+        break;
+      }
+    }
+  }
+  return toks;
+}
+
+function pickMaterial(opts: {
   jobText: string;
   lineLabel: string;
   templateQty: number;
   candidates: Material[];
-}): Promise<PickResult | null> {
-  const apiKey = process.env.OPENAI_API_KEY || '';
-  if (!apiKey || opts.candidates.length === 0) return null;
-
-  const candidateLines = opts.candidates.map(
-    m =>
-      `${m.id} | ${m.name} | ${m.brand || 'no brand'} | $${(m.public_price_cents / 100).toFixed(2)} CAD | per ${m.unit}`,
-  );
-
-  const ai = new OpenAI({ apiKey, timeout: 25000, maxRetries: 0 });
-  try {
-    const completion = await ai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      max_tokens: 200,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You pick one product from an internal materials catalog for a field-service estimate. ' +
-            'Reply with ONLY valid JSON, no markdown, no explanation.',
-        },
-        {
-          role: 'user',
-          content:
-            `Job: ${opts.jobText.slice(0, 1500)}\n` +
-            `Line to fill: "${opts.lineLabel}" (template quantity ${opts.templateQty})\n` +
-            `Candidates (id | name | brand | price | unit):\n${candidateLines.join('\n')}\n\n` +
-            `Return {"material_id": "<one id from the list above>" | null, "quantity": <number>}. ` +
-            `Pick the single best match; quantity = units needed for the job (default 1). ` +
-            `Return material_id null when nothing fits. Never invent an id.`,
-        },
-      ],
-    });
-    const text = completion.choices?.[0]?.message?.content ?? '';
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { material_id?: unknown; quantity?: unknown };
-    const ids = new Set(opts.candidates.map(c => c.id));
-    const material_id =
-      typeof parsed.material_id === 'string' && ids.has(parsed.material_id) ? parsed.material_id : null;
-    const quantity = sanitizeQty(parsed.quantity, 1);
-    return { material_id, quantity: Math.min(quantity, 100) };
-  } catch {
-    return null;
+}): PickResult | null {
+  const n = opts.candidates.length;
+  if (n === 0) return null;
+  const labelToks = matchTokens(opts.lineLabel);
+  const jobToks = matchTokens(opts.jobText);
+  const toksets = opts.candidates.map(matchCandidateTokens);
+  const df = new Map<string, number>();
+  for (const toks of toksets) {
+    for (const t of toks) df.set(t, (df.get(t) || 0) + 1);
   }
+  const idf = (t: string) => Math.log(n / (1 + (df.get(t) || 0))) + 1;
+  const scored = opts.candidates.map((c, i) => {
+    const toks = toksets[i];
+    let s = 0;
+    for (const t of new Set(labelToks)) {
+      if (toks.has(t)) s += (MATCH_GENERIC.has(t) ? 1 : 2) * idf(t);
+    }
+    for (const t of new Set(jobToks)) {
+      if (toks.has(t)) s += 0.5 * idf(t);
+    }
+    return { s, c };
+  });
+  scored.sort((a, b) => b.s - a.s || a.c.public_price_cents - b.c.public_price_cents);
+  if (scored[0].s < MATCH_THRESHOLD) return null;
+  return { material_id: scored[0].c.id, quantity: opts.templateQty };
 }
 
 export async function POST(request: Request) {
