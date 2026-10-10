@@ -181,22 +181,49 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: job, error: jobError } = await db
-      .from('jobs')
-      .insert({
-        organization_id,
-        client_id,
-        request: request_title,
-        details: detailLines.join('\n'),
-        status: 'lead',
-        service,
-        assessment_fee_cents,
-        assessment_fee_status,
-        source_ref,
-      })
-      .select('id')
-      .single();
-    if (jobError) throw jobError;
+    // Optional columns (source_ref, validation) — gracefully skip if their
+    // migrations haven't been applied yet.
+    const jobRow: Record<string, any> = {
+      organization_id,
+      client_id,
+      request: request_title,
+      details: detailLines.join('\n'),
+      status: 'lead',
+      service,
+      assessment_fee_cents,
+      assessment_fee_status,
+    };
+    if (source_ref) jobRow.source_ref = source_ref;
+    if (validation.address.latitude != null) jobRow.latitude = validation.address.latitude;
+    if (validation.address.longitude != null) jobRow.longitude = validation.address.longitude;
+    jobRow.validation = {
+      email: validation.email,
+      phone: validation.phone,
+      address: {
+        checked: validation.address.checked,
+        found: validation.address.found,
+        display_name: validation.address.display_name ?? null,
+      },
+    };
+
+    let job: any = null;
+    {
+      const r1 = await db.from('jobs').insert(jobRow).select('id').single();
+      if (!r1.error) {
+        job = r1.data;
+      } else if (/source_ref|latitude|longitude|validation/.test(r1.error.message || '')) {
+        // Migration not applied yet — retry without the optional columns.
+        delete jobRow.source_ref;
+        delete jobRow.latitude;
+        delete jobRow.longitude;
+        delete jobRow.validation;
+        const r2 = await db.from('jobs').insert(jobRow).select('id').single();
+        if (r2.error) throw r2.error;
+        job = r2.data;
+      } else {
+        throw r1.error;
+      }
+    }
 
     return Response.json({
       ok: true,

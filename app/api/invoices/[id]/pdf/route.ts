@@ -65,8 +65,8 @@ export async function GET(
       }
     }
 
-    // Build PDF with pdfkit (loaded dynamically so the route stays light).
-    const PDFDocument = (await import('pdfkit')).default;
+    // Build PDF with pdfkit.
+    const { default: PDFDocument } = await import('pdfkit');
     const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
