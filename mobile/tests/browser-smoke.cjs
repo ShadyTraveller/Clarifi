@@ -12,10 +12,10 @@ const claims = { sub: userId, role: 'authenticated', exp: Math.floor(Date.now() 
 const accessToken = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.fixture`;
 
 async function scenario(browser, role, options = {}) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ viewport: { width: options.width || 390, height: options.width >= 840 ? 900 : 844 } });
   const page = await context.newPage();
-  const errors = [], tables = [], orgs = [];
-  let failJobs = false;
+  const errors = [], tables = [], orgs = [], jobUrls = [];
+  let failJobs = false, unavailableJob = false;
   page.on('pageerror', error => errors.push(error.message));
   const user = { id: userId, email: `${role}@example.test`, aud: 'authenticated', role: 'authenticated', user_metadata: {}, app_metadata: {}, created_at: new Date().toISOString() };
   await page.route('https://fixture.supabase.co/**', async route => {
@@ -43,7 +43,9 @@ async function scenario(browser, role, options = {}) {
       return reply([{ id: profileId }]);
     }
     if (table === 'jobs') {
+      jobUrls.push(url);
       if (failJobs) return reply({ message: 'Synthetic outage' }, 503);
+      if (unavailableJob && url.searchParams.has('id')) return reply([]);
       if (request.method() === 'HEAD') {
         assert.equal(url.searchParams.get('status'), 'eq.lead');
         assert.equal(url.searchParams.get('assigned_to'), 'is.null');
@@ -54,11 +56,18 @@ async function scenario(browser, role, options = {}) {
         assert.match(url.searchParams.get('or'), new RegExp(userId));
         assert.match(url.searchParams.get('or'), new RegExp(profileId));
       }
-      const start = url.searchParams.getAll('scheduled_start').find(value => value.startsWith('gte.')).slice(4);
-      assert.ok(url.searchParams.getAll('scheduled_start').some(value => value.startsWith('lt.')));
+      const bound = url.searchParams.getAll('scheduled_start').find(value => value.startsWith('gte.'));
+      const start = bound ? bound.slice(4) : new Date().toISOString();
+      if (bound) assert.ok(url.searchParams.getAll('scheduled_start').some(value => value.startsWith('lt.')));
       assert.ok(!url.searchParams.get('service').includes('windows'));
       if (options.empty) return reply([]);
-      return reply([{ id: 'job-a', client_id: clientId, request: 'Rekey front door lock', status: 'active', service: 'locksmith', scheduled_start: new Date(new Date(start).getTime() + 9 * 3600000).toISOString(), scheduled_end: null, assigned_to: userId, technician_id: profileId }]);
+      const job = { id: 'job-a', client_id: clientId, request: 'Rekey front door lock', status: url.searchParams.get('status')?.slice(3) || 'active', service: 'locksmith', scheduled_start: new Date(new Date(start).getTime() + 9 * 3600000).toISOString(), scheduled_end: null, assigned_to: userId, technician_id: profileId };
+      const paginated = options.paginate && !bound && !url.searchParams.has('id') && !url.searchParams.has('request');
+      const total = paginated ? 26 : 1;
+      const offset = Number(url.searchParams.get('offset') || 0);
+      const limit = Number(url.searchParams.get('limit') || 25);
+      const rows = paginated ? Array.from({ length: Math.min(limit, Math.max(0, total - offset)) }, (_, index) => ({ ...job, id: `job-${offset + index}` })) : [job];
+      return reply(rows, 200, { 'content-range': `${offset}-${offset + rows.length - 1}/${total}`, 'access-control-expose-headers': 'content-range' });
     }
     if (table === 'notifications') return route.fulfill({ status: 200, headers: { ...cors, 'content-range': '0-2/3', 'access-control-expose-headers': 'content-range' }, body: '' });
     if (table === 'clients') return reply([{ id: clientId, name: org === `eq.${orgB}` ? 'East Client' : 'Morgan Lee', address: '25 King St, Toronto' }]);
@@ -70,13 +79,66 @@ async function scenario(browser, role, options = {}) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   if (options.multi) await page.getByRole('button', { name: 'Open Yavamo Toronto' }).click();
   if (options.empty) await page.getByText('A little room in the day').waitFor();
-  else await page.getByText('Morgan Lee', { exact: true }).waitFor();
+  else await page.getByTestId('home-screen').getByText('Morgan Lee', { exact: true }).waitFor();
   assert.equal(await page.getByText('Unassigned requests', { exact: true }).count(), role === 'technician' ? 0 : 1);
   if (role === 'technician') assert.ok(!tables.includes('notifications'), 'Technician must not query the office alert queue');
   assert.ok(!tables.some(table => ['quotes', 'quote_versions', 'quote_line_items', 'supplier_materials', 'part_tracking'].includes(table)));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: `artifacts/${role}${options.empty ? '-empty' : ''}.png`, fullPage: true });
+  await page.screenshot({ path: `artifacts/home-${options.width || 390}${options.empty ? '-empty' : ''}.png`, fullPage: true });
   if (!options.empty) {
+    await page.getByRole('button', { name: 'Open job for Morgan Lee: Rekey front door lock' }).click();
+    await page.getByText('The request', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('tab', { name: 'Work', exact: true }).getAttribute('aria-selected'), 'true');
+    await page.getByRole('tab', { name: 'Home', exact: true }).click();
+    await page.getByTestId('home-screen').getByText('Morgan Lee', { exact: true }).waitFor();
+    unavailableJob = true;
+    await page.getByRole('button', { name: 'Open job for Morgan Lee: Rekey front door lock' }).click();
+    await page.getByText('Job unavailable', { exact: true }).waitFor();
+    unavailableJob = false;
+    await page.getByRole('tab', { name: 'Home', exact: true }).click();
+    await page.getByTestId('home-screen').getByText('Morgan Lee', { exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Schedule', exact: true }).click();
+    await page.getByTestId('schedule-screen').getByText('Morgan Lee', { exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Month view' }).click();
+    assert.equal(await page.getByRole('tab', { name: 'Month view' }).getAttribute('aria-selected'), 'true');
+    await page.getByRole('button', { name: 'Next month', exact: true }).click();
+    await page.getByTestId('schedule-screen').getByText('Morgan Lee', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    const chosen = await page.locator('[aria-pressed="true"]').getAttribute('aria-label');
+    await page.getByRole('tab', { name: 'Week view' }).click();
+    assert.equal(await page.locator('[aria-pressed="true"]').getAttribute('aria-label'), chosen, 'Changing calendar mode preserves the selected day');
+    await page.getByRole('tab', { name: 'Month view' }).click();
+    await page.screenshot({ path: `artifacts/schedule-${options.width || 390}.png`, fullPage: true });
+    await page.getByRole('tab', { name: 'Work', exact: true }).click();
+    await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).first().waitFor();
+    await page.getByRole('tab', { name: 'Completed', exact: true }).click();
+    await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).first().waitFor();
+    if (options.paginate) {
+      assert.equal(await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).count(), 25);
+      await page.getByRole('button', { name: 'Next', exact: true }).click();
+      await page.getByText('26–26 of 26', { exact: true }).waitFor();
+      assert.equal(await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).count(), 1);
+      assert.ok(jobUrls.some(url => url.searchParams.get('offset') === '25'));
+    }
+    await page.getByLabel('Search job details').fill('Rekey');
+    await page.getByRole('button', { name: 'Search work', exact: true }).click();
+    await page.waitForFunction(() => document.body.textContent.includes('matching “Rekey”'));
+    await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).first().waitFor();
+    assert.ok(jobUrls.some(url => url.searchParams.get('request') === 'ilike.%Rekey%'));
+    assert.ok(jobUrls.some(url => url.searchParams.get('id') === 'eq.job-a'));
+    assert.ok(jobUrls.some(url => url.searchParams.get('status') === 'eq.completed'));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: `artifacts/work-${options.width || 390}.png`, fullPage: true });
+    failJobs = true;
+    await page.getByRole('tab', { name: 'Requests', exact: true }).click();
+    await page.getByTestId('work-screen').getByText('Could not load work. Check your connection and try again.', { exact: true }).waitFor();
+    failJobs = false;
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await page.getByTestId('work-screen').getByText('Morgan Lee', { exact: true }).first().waitFor();
+
+    await page.getByRole('tab', { name: 'Home', exact: true }).click();
+    await page.getByTestId('home-screen').getByText('Morgan Lee', { exact: true }).waitFor();
     failJobs = true;
     await page.getByRole('button', { name: 'Refresh dashboard' }).click();
     await page.getByText('Showing the last successful update. Counts may have changed.').waitFor();
@@ -89,7 +151,7 @@ async function scenario(browser, role, options = {}) {
   if (options.multi) {
     await page.getByRole('button', { name: 'Yavamo East', exact: true }).click();
     await page.getByText('East Client', { exact: true }).waitFor();
-    assert.equal(await page.getByText('Morgan Lee', { exact: true }).count(), 0);
+    assert.equal(await page.getByTestId('home-screen').getByText('Morgan Lee', { exact: true }).count(), 0);
     assert.ok(orgs.includes(`eq.${orgB}`));
     await page.getByRole('button', { name: 'Account and workspace' }).click();
   }
@@ -105,8 +167,9 @@ async function scenario(browser, role, options = {}) {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH, args: ['--no-sandbox'] });
   try {
     await scenario(browser, 'dispatcher', { multi: true });
-    await scenario(browser, 'technician');
+    await scenario(browser, 'technician', { width: 320 });
+    await scenario(browser, 'dispatcher', { width: 1280, paginate: true });
     await scenario(browser, 'dispatcher', { empty: true });
-    console.log('Synthetic browser checks passed: sign-in, role queries, workspace switching, stale/error recovery, empty state, mobile width, and sign-out. Live RLS and Android device verification remain pending.');
+    console.log('Synthetic browser checks passed: sign-in, role queries, workspace switching, schedule week/month navigation, work search/status filters and pagination, unavailable/scoped job detail, selected-day preservation, mobile/tablet width, stale/error recovery, empty state, and sign-out. Live RLS and Android device verification remain pending.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

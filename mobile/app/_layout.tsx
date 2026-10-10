@@ -9,6 +9,7 @@ import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { colors } from '../lib/theme';
+import { AppShell } from '../components/AppShell';
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
@@ -22,8 +23,12 @@ export default function RootLayout() {
 }
 function Navigator() {
   const { member } = useAuth();
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
+  const routes = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.paper } }}>
     <Stack.Screen name="index" />
-    <Stack.Protected guard={!!member}><Stack.Screen name="account" /></Stack.Protected>
+    <Stack.Protected guard={!!member}>
+      <Stack.Screen name="account" /><Stack.Screen name="schedule" /><Stack.Screen name="work" /><Stack.Screen name="jobs/[id]" />
+    </Stack.Protected>
   </Stack>;
+  // Keep the navigator mounted while protected routes and workspace chrome change.
+  return <AppShell>{routes}</AppShell>;
 }

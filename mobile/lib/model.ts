@@ -17,6 +17,10 @@ export type DashboardJob = {
   clientName: string; address: string | null;
 };
 export type DashboardData = { jobs: DashboardJob[]; unassigned: number | null; alerts: number | null; checkedAt: Date };
+export type WorkJob = Omit<DashboardJob, 'scheduled_start'> & { scheduled_start: string | null };
+export const jobStatuses = ['lead', 'estimate', 'active', 'completed'] as const;
+export type JobStatus = typeof jobStatuses[number];
+export const statusLabels: Record<JobStatus, string> = { lead: 'Request', estimate: 'Estimate', active: 'Job', completed: 'Completed' };
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (roles as readonly string[]).includes(value);
 }

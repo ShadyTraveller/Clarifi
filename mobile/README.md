@@ -1,9 +1,10 @@
-# Yavamo mobile — foundation and dashboard
+# Yavamo mobile — workspace navigation
 
 Android-first Expo app for dispatch and technicians. This feature implements
 email/password sign-in, encrypted native session persistence, workspace selection,
-the dashboard, and account/sign-out. Other screens are separate features. Scheduling
-and assignments remain manual. Week **and month** views are in the agreed backlog.
+the dashboard, responsive navigation, week/month calendar with a daily agenda,
+paginated work lists, read-only job details, and account/sign-out. Scheduling
+and assignments remain manual; assignment editing is a subsequent feature.
 
 ## Run
 
@@ -120,3 +121,38 @@ For future emails, the project owner should set the Supabase Auth Site URL to
 `https://www.yavamo.ca` and allow the intended confirmation/reset redirect in
 [Auth URL configuration](https://supabase.com/dashboard/project/jgbciyogyratfplofizv/auth/url-configuration).
 A redirect supplied at sign-up must be allowlisted there to take effect.
+
+## Navigation and screen scope
+
+Home, Schedule, Work, and Account share a persistent navigation bar on phones.
+At 840 logical pixels and above, it becomes a navigation rail. The workspace
+header stays visible; the active destination is labelled and highlighted.
+
+- **Home:** today’s appointments, office queue counts, shortcuts to Schedule and
+  Work. Appointment cards open job details.
+- **Schedule:** Monday-first week and month selectors, previous/next period,
+  today shortcut, and a selected-day agenda in Toronto time. Appointments are
+  paginated so busy days do not silently disappear at the API row limit.
+- **Work:** Requests / Estimates / Jobs / Completed filters on job status,
+  submitted search of job request text, and 25-item pages. These are job pipeline
+  lists; quote review and invoice boards are not implemented yet.
+- **Job detail:** request, client name/address, appointment time, and current
+  status. Detail requests reuse the organization and technician assignment
+  filters, including direct links. Missing or unavailable jobs have a clear
+  empty state. Notes/photos and status mutation/completion guards remain pending.
+- **Account:** workspace selection, role display, and sign-out.
+
+Client quick-entry, manual map, agent-output feed, assignment editing, invoice
+boards, and full notes/files workflows remain subsequent contract features.
+No placeholder navigation links are presented as working actions.
+
+`tests/browser-smoke.cjs` checks synthetic dispatcher and technician flows at
+320, 390, and 1280-pixel widths, including active navigation, week/month changes,
+work filters/search and pagination, unavailable/scoped job links, retry and
+stale-data recovery, selected-day preservation, workspace switching,
+and sign-out. Calendar tests cover Toronto DST, leap years, and year rollover.
+
+Live browser checks also pass for both approved roles across Home, Schedule,
+Work status filters, Account, and sign-out. No business records were changed
+during these checks. Android export passes; device behavior and the backend
+authorization review remain separate verification items.
