@@ -204,6 +204,15 @@ export async function POST(request: Request) {
       job_id: job.id,
       assessment_fee_cents,
       assessment_fee_status,
+      validation: {
+        flags,
+        email: validation.email,
+        phone: validation.phone,
+        address: {
+          checked: validation.address.checked,
+          found: validation.address.found,
+        },
+      },
     });
   } catch (error) {
     return Response.json({ error: 'The request could not be created.' }, { status: 500 });
