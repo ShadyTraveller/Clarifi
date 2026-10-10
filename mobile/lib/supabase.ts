@@ -17,7 +17,7 @@ export function getSupabase() {
   if (instance) return instance;
   const { url, key } = validatePublicConfig(
     process.env.EXPO_PUBLIC_SUPABASE_URL,
-    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   );
   instance = createClient(url, key, { auth: {
     storage: Platform.OS === 'web' ? webStorage : createChunkStorage(SecureStore),

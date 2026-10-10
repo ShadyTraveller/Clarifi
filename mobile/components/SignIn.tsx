@@ -15,7 +15,7 @@ export function SignIn() {
     setBusy(true);
     try {
       const { error: failure } = await db.auth.signInWithPassword({ email: email.trim(), password });
-      if (failure) setError(failure.status === 400 ? 'Email or password is incorrect. Please try again.' : 'Could not sign in. Check your connection and try again.');
+      if (failure) setError(failure.code === 'email_not_confirmed' ? 'Confirm your account using the link in your email, then sign in again.' : failure.status === 400 ? 'Email or password is incorrect. Please try again.' : 'Could not sign in. Check your connection and try again.');
       else setPassword('');
     } catch { setError('Could not sign in. Check your connection and try again.'); }
     finally { setBusy(false); }

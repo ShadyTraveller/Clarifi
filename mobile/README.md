@@ -7,16 +7,18 @@ and assignments remain manual. Week **and month** views are in the agreed backlo
 
 ## Run
 
-Use Node 24. From `mobile/`, run `npm ci`, copy `.env.example` to `.env.local`,
-then set the **staging** project URL and publishable key. Both values are public
-client configuration. Never add server keys or passwords to these files.
+Use Node 24. From `mobile/`, run `npm ci`, copy `.env.example` to `.env`,
+then set the web app's existing Supabase project URL and publishable key. Both values are public
+client configuration. The app also accepts `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+for compatibility, with `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` taking precedence if both are present. Never add server keys or passwords to these files.
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=https://YOUR-STAGING-REF.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR-STAGING-PUBLISHABLE-KEY
+EXPO_PUBLIC_SUPABASE_URL=https://jgbciyogyratfplofizv.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR-PUBLISHABLE-KEY
 ```
 
-Run `npx expo start` and open the Android app in the matching Expo Go version or
+Run `npx expo start` (or `npm run start:tunnel` when the phone cannot reach the
+development machine directly) and open the Android app in the matching Expo Go version or
 an Android development build. No iOS build or Apple account is needed. The web
 export exists only for UI/browser verification; its session is deliberately kept
 in memory. Android sessions use Expo SecureStore, chunked for large session values.
@@ -52,24 +54,24 @@ changing configuration. Never distribute a synthetic build as a live app.
 - This feature performs no job writes and calls no `/api/agents/*` endpoints.
 - No pricing math is implemented. Future estimate work must use the shared engine.
 
-## Live staging verification — pending provisioning
+## Live verification on the existing project
 
-Use an isolated Supabase development branch with synthetic records. Before creating
-it, obtain its current cost and have Lavie confirm it. Invitations and fixture
-records below have **not** been created by this feature.
+Lavie approved using the web app's existing Supabase project. A separate staging
+project is optional, not a prerequisite. Live checks use the signed-in user's
+session and clearly labelled test records; no server key ships in the app.
 
-Planned accounts (approved by Lavie):
+Provisioned, email-confirmed accounts (approved by Lavie):
 
-| Email | Staging role |
+| Email | Test role |
 | --- | --- |
 | quoteunquoteapp@gmail.com | dispatcher |
 | shaedytraveler@gmail.com | technician |
 
-The backend owner provisions the active memberships and links the technician
-profile using `auth_user_id`. Test two organizations, each with a synthetic client
+Both accounts have active memberships in Clarifi Workspace; the technician
+profile is linked using `auth_user_id`. Test two organizations, each with a synthetic client
 and job; create a second-org membership only for its designated tester. Confirm:
 
-1. Dispatcher sign-in, appointments and both queue counts match staging data.
+1. Dispatcher sign-in, appointments and both queue counts match the project data.
 2. Technician sign-in shows only assigned jobs, including `technician_id` links;
    there are no office queue counts or supplier-price requests.
 3. Direct Data API requests with org A's session cannot read or mutate org B data.
@@ -84,14 +86,18 @@ and job; create a second-org membership only for its designated tester. Confirm:
 Use secure invitations or password reset to set passwords; do not paste them into
 chat, commit them, or save them in test scripts. Live automated testing should take
 credentials from temporary runtime secrets and never log tokens or raw responses.
+Keep private runtime files outside the Expo project directory: its development
+environment loader discovers `.env*` files. Only public project configuration
+belongs in `mobile/.env`.
 
-`node tests/live-access.mjs` provides read-only staging checks for both roles,
-cross-organization access, and backend supplier-cost denial. Supply public staging
+`node tests/live-access.mjs` provides read-only live checks for both roles,
+cross-organization access, and backend supplier-cost denial. Supply public project
 configuration plus `YAVAMO_DISPATCH_EMAIL`, `YAVAMO_DISPATCH_PASSWORD`,
 `YAVAMO_TECH_EMAIL`, `YAVAMO_TECH_PASSWORD`, `YAVAMO_TEST_ORG_A`,
 `YAVAMO_TEST_ORG_B`, and `YAVAMO_TEST_MATERIAL_ID` through runtime settings.
-The material id must name an org A fixture visible to dispatch. The script refuses
-the production project. It has not been run against live data yet.
+The material id must name an org A fixture visible to dispatch. These checks
+perform no job/catalog writes. Account sign-in still needs an email-confirmed user
+and an active membership; a public key alone does not grant workspace access.
 
 ## Backend review for Muse
 
@@ -99,9 +105,18 @@ The contract belongs to Muse; it has not been changed. Please record week/month
 calendar scope, the canonical `security_film` key, and the assignment linkage above.
 The live project contains `active`, `display_name`, and `technicians.auth_user_id`,
 but parts of that schema/policy setup are not reproducible from the checked-in
-migrations alone. A fresh staging branch must be checked for these dependencies.
+migrations alone. Any future fresh project must be checked for these dependencies.
 Resolve missing migrations/policies backend-side, not in the mobile feature.
 
-Before approving live verification, confirm database policies enforce technician
+Confirm database policies enforce technician
 job access, protected internal pricing, administrator-only role changes, and active
 membership. This PR does not change or certify those policies.
+
+## Confirmation redirects
+
+Both test accounts are confirmed. Their email links redirected to an unavailable
+`localhost:3000` page after verification; this did not prevent confirmation.
+For future emails, the project owner should set the Supabase Auth Site URL to
+`https://www.yavamo.ca` and allow the intended confirmation/reset redirect in
+[Auth URL configuration](https://supabase.com/dashboard/project/jgbciyogyratfplofizv/auth/url-configuration).
+A redirect supplied at sign-up must be allowlisted there to take effect.
