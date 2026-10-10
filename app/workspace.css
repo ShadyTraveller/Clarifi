@@ -58,3 +58,10 @@
 .bottom-nav .nav-active{color:#101311;box-shadow:inset 0 3px 0 var(--accent)}
 }
 @media print{.app-title,.topbar,.workspace-footer,.bottom-nav{display:none}.shell{background:#fff;color:#111}.shell .main-shell{width:100%;margin:0}.estimate-preview{padding:0}.pipeline-board{grid-template-columns:1fr 1fr}}
+
+/* Office edit/delete actions on cards */
+.card-actions{display:flex;gap:4px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.card-actions .text-button{font-size:13px;padding:6px 10px;border-radius:8px}
+.card-actions .text-button:hover{background:var(--paper)}
+.danger-text{color:#b3261e}
+.modal .danger-text{color:#b3261e}
