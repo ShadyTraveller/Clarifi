@@ -1,0 +1,27 @@
+# Yavamo Codex development subagents. Add future agents under [agents.<name>].
+[features]
+multi_agent = true
+
+[agents.client_entry]
+description = "client entry specialist for Yavamo"
+config_file = "agents/client-entry.toml"
+
+[agents.request_triage]
+description = "request triage specialist for Yavamo"
+config_file = "agents/request-triage.toml"
+
+[agents.estimate_generator]
+description = "estimate generator specialist for Yavamo"
+config_file = "agents/estimate-generator.toml"
+
+[agents.scheduling_dispatch]
+description = "scheduling dispatch specialist for Yavamo"
+config_file = "agents/scheduling-dispatch.toml"
+
+[agents.invoicing]
+description = "invoicing specialist for Yavamo"
+config_file = "agents/invoicing.toml"
+
+[agents.financial_analyst]
+description = "financial analyst specialist for Yavamo"
+config_file = "agents/financial-analyst.toml"
