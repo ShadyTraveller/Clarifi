@@ -48,8 +48,10 @@ begin
   limit 1;
 
   -- Safe role: downgrade anything the enum doesn't know to 'other'.
+  -- Note: UI 'owner' maps to 'other' (no owner enum value); 'institution'
+  -- requires migration 202610050001 (downgraded until applied).
   v_role := coalesce(client_info->>'role', 'other');
-  if v_role not in ('tenant', 'landlord', 'property_management', 'commercial', 'other') then
+  if v_role not in ('tenant', 'landlord', 'property_management', 'institution', 'commercial', 'other') then
     v_role := 'other';
   end if;
 
