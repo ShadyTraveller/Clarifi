@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Yavamo",
+    "slug": "yavamo-mobile",
+    "scheme": "yavamo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": [
+      "android",
+      "web"
+    ],
+    "android": {
+      "package": "ca.yavamo.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Yavamo to choose photos for a job request.",
+          "cameraPermission": "Allow Yavamo to take photos for a job request.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}
