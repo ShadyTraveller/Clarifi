@@ -76,11 +76,13 @@ grant execute on function private.is_org_admin(uuid) to authenticated;
 drop policy if exists "members can read supplier materials" on public.supplier_materials;
 drop policy if exists "members can write supplier materials" on public.supplier_materials;
 
+drop policy if exists "office can read supplier materials" on public.supplier_materials;
 create policy "office can read supplier materials"
   on public.supplier_materials
   for select to authenticated
   using (private.is_office_member(organization_id));
 
+drop policy if exists "office can write supplier materials" on public.supplier_materials;
 create policy "office can write supplier materials"
   on public.supplier_materials
   for all to authenticated
@@ -96,6 +98,7 @@ create policy "members can read members"
 
 drop policy if exists "members can write members" on public.organization_members;
 
+drop policy if exists "admins can manage members" on public.organization_members;
 create policy "admins can manage members"
   on public.organization_members
   for all to authenticated
