@@ -84,8 +84,9 @@ existing client/web intake; this does not presume a new client account in mobile
 3. Estimate route: prepare a draft, office reviews that exact revision, then send
    the approved version to the client. Changes invalidate prior approval. Client
    acceptance AND confirmed receipt of the required percentage deposit are required
-   before scheduling. Deposit percentage and direct/emergency-job application await
-   user clarification; do not choose a percentage in mobile.
+   before scheduling, including direct jobs. Use the existing client-role defaults
+   below after Muse reconciles server policy. Emergency prepayment/call-out rules
+   await user clarification; do not invent a rate or cancellation fee in mobile.
 4. Job route: select an available qualified technician and valid appointment window;
    atomically save both assignment and booking. The estimate route joins this stage
    when its required approvals/acceptance have been met.
@@ -214,3 +215,128 @@ References: https://docs.stripe.com/sandboxes and
 https://docs.expo.dev/versions/latest/sdk/stripe/ . Testing is not launch readiness;
 live processing has fees and requires merchant onboarding. No provider account or
 payment integration was created by this requirements update.
+
+## Client-centred dispatch and workforce requirements (2026-10-11)
+
+### Existing deposit defaults: verified code and live mismatch
+
+Web `app/page.tsx:37` on `origin/main` (1970204) defines:
+
+| Client relationship | UI default deposit |
+| --- | ---: |
+| Property management | 25% |
+| Commercial | 25% |
+| Institution | 50% |
+| Owner | 50% |
+| Landlord | 50% |
+| Tenant | 100% |
+| Other | 50% |
+
+`app/Composers.tsx` applies the same grouping when selecting a request; office
+can override the quote. Shared `buildEstimate` defaults to 50% if omitted and
+agent estimate input also supplies 50%; it is not a shared role-policy resolver.
+Mobile currently neither collects nor enforces deposits.
+
+Read-only inspection of the live `set_quote_commercial_terms` and
+`private.resolve_deposit_percent` functions on 2026-10-11 found a different rule:
+explicit override → nonzero scope-template default → markup-profile default → 0.
+The resolver does not use its target_job argument or look up client relationship.
+Thus the UI table is not proof of the actual deposit on a saved quote. Muse must
+unify backend/shared policy and expose resolved amount, percentage, basis,
+source/override and revision to both clients; mobile must not duplicate the map
+as financial authority. Do not silently treat a 0% fallback as satisfying the
+new dispatch gate. Changes to already accepted terms require explicit handling.
+
+The user confirms deposit requirements apply to direct jobs. Emergency dispatch
+must not proceed from a customer's promise to pay or an unconfirmed payment.
+The user describes a customer disappearing after another person resolves the
+problem: show verified collection, customer confirmation, cancellation/contact
+status and a disclosed call-out policy before travel. Whether emergency work
+requires full prepayment or standard role deposit remains open. Never promise
+prepayment eliminates no-shows, disputes or chargebacks. No cancellation charge
+is invented or automatically taken. The car-lockout example describes no-show
+risk; automotive service is not added to the currently contracted service list.
+
+### One client record throughout the flow
+
+Client identity is the persistent navigation anchor for requests, estimates,
+appointments, jobs, files, payments, invoices and history. A technician can open
+the next appointment directly to a client/job summary without traversing Request
+→ Estimate → Job. Preserve distinct job/visit IDs underneath a single client so
+notes, payments and parts for simultaneous jobs do not mix. Every schedule card
+links to that same context. Repeat visits retain history and preferred technician
+when skills, availability and customer preference permit; preference never
+bypasses booking conflicts or qualifications.
+
+### Role-specific working views
+
+- Owner: at-a-glance workload, uncovered jobs, available minutes/capacity,
+  unassigned urgent work and exceptions requiring a decision. Availability and
+  capacity are computed from verified schedules, not technician headcount. Let
+  authorized dispatch/office handle routine decisions without owner approval;
+  backend documents delegated permissions and escalation thresholds.
+- Dispatch/office: one schedule board with map, technician lanes, client/job
+  detail panel, notes, readiness, communications and move/assign actions. Keep
+  selection and context while handling changes; avoid repeated tab navigation.
+- Technician: next job, confirmed window/duration, client/contact/address, scope,
+  access instructions, parts readiness, travel/arrival state and next handoff.
+  Surface new critical notes and schedule changes without searching other stages.
+
+### Capacity, hours and appointment preparation
+
+- Normal office/technician hours: 08:00–17:00 Toronto time. Plan roughly 5–6 jobs
+  per technician/day, but duration, travel, breaks and service complexity constrain
+  capacity before count. A six-job hard cap versus recorded office exception is
+  awaiting user choice. No automatic packing of six long jobs into a short day.
+- An extra 1–2 hours may be needed to finish work; flag it explicitly as overtime,
+  require the documented authorization and do not extend every shift by default.
+  The ability to finish an overrun is not permission to double-book another job.
+- Bookings include customer/service details, expected duration, realistic start/end,
+  access permissions, gate/guardhouse code or contact, pets, parking, tenant rules,
+  special instructions and COI requirements. Each appointment requires an explicit
+  reviewed value or 'not applicable'; blank is not confirmation. Reconfirm reusable
+  client access notes for a new site/visit rather than blindly copying stale codes.
+- COI-required visits show requested/prepared/verified state, document reference,
+  applicable property/client and validity. Do not call a visit ready while required
+  access permission or insurance documentation is unresolved. Muse defines gates.
+- Use clear service titles with consistent accessible service colours for Doors,
+  Security film, Locksmith and Red-light skincare. Include text/icons; never use
+  colour alone or confuse service colour with urgency or payment status.
+- Keep staff-only notes separate from customer-facing text, with server-enforced
+  audience and role rules. Show only permitted projections; no internal costs or
+  private notes in client messages or technician-facing financial views.
+
+### Arrival, route visibility and synchronization
+
+The user now requests arrival/location/route tracking; this expands the older
+manual-pin map requirement. Muse must specify location permission, on-duty
+collection, platform/background behavior, access rules, retention, timestamp and
+accuracy fields before integration. Show current/stale/unavailable explicitly.
+Off-duty tracking is not implied. Compare fresh positions and recorded travel/
+arrival events with scheduled jobs; GPS proximity alone is not proof of arrival,
+work completion or customer presence. Provide explicit technician arrival updates
+and reconcile them with automatic signals when available.
+
+Web and mobile should observe the same authoritative client/job/visit state.
+Use authenticated organization/assignment-scoped subscriptions, versioned writes,
+duplicate/out-of-order event handling, refresh after reconnect and visible
+connecting/up-to-date/stale/failed-save states. A lost connection must not look
+like continuous syncing, and stale cached availability cannot authorize booking.
+Background delivery/push requires its own contract; no always-on guarantee from
+a foreground socket. Important reassignment/arrival/notes updates need delivery
+and acknowledgement evidence for the correct office/technician recipients.
+
+Current mobile uses focus/foreground/manual refresh; dashboard additionally polls
+while foregrounded. It does not yet provide continuous cross-device synchronization,
+live technician GPS, travel routing, slot availability or payment enforcement.
+
+### Additional verification before rollout
+
+Verify role defaults against server-resolved deposits (including overrides and
+missing profiles); direct-job and emergency dispatch gates; customer cancellation
+while a technician is travelling; per-tech count/duration/travel capacity; repeat
+client preference with unavailable tech; missing/expired COI or access permission;
+multiple simultaneous jobs for one client; inaccessible staff-only notes; offline
+and stale location; reconnect/out-of-order events; and concurrent office/technician
+updates. Demonstrate owner/dispatch/tech views independently without making the
+owner a required actor for every ordinary action.
