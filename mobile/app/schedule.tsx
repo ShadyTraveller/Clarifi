@@ -48,7 +48,7 @@ function Agenda() {
     <View style={[s.agendaPane, wide && { flex: 1 }]}>
     <View style={s.agendaHeading}><View style={{ flex: 1 }}><Text accessibilityRole="header" style={pageStyles.section}>{dayLabel(dateForKey(selectedDay))}</Text><Text style={s.agendaDetail}>{member!.role === 'technician' ? 'Your assigned appointments' : 'Your team’s appointments'}</Text></View>{data && <Text style={s.count}>{data.total}</Text>}</View>
     <QueryState busy={busy} error={error} hasData={!!data} retry={() => { void refresh(); }} />
-    {data && (data.jobs.length ? <JobList jobs={data.jobs} /> : <Card><StateMessage title="Space in the schedule" detail="No appointments for this day. Choose another date to see what’s planned." icon="calendar" /></Card>)}
+    {data && (data.jobs.length ? <JobList jobs={data.jobs} /> : <Card><StateMessage title="No appointments shown" detail="No appointments are listed for this day. Confirm technician availability with dispatch before booking." icon="calendar" /></Card>)}
     {data && <PageControls page={page} total={data.total} busy={busy} onPage={setPage} />}
     </View></View>
     <View style={s.note}><Icon name="info" size={16} color={colors.muted} /><Text style={pageStyles.subtle}>Dispatch manages scheduling and assignments. Pull down to refresh.</Text></View>

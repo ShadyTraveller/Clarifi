@@ -65,3 +65,115 @@ network loss/restart and ensure errors cannot look like success. Verify RLS with
 both roles. Customer-delivery tests require a designated test recipient/provider
 sandbox; no real customer messages. Keep release blocked on these scenarios for
 the corresponding features until backend and mobile evidence is available.
+
+## Scheduling and financial lifecycle (user expansion, 2026-10-11)
+
+The user explicitly expands scope to scheduling/assignment, emergency dispatch,
+payment recording and office-reviewed invoicing. The older contract lists payments
+and client-facing screens as non-goals. This request supersedes that product scope,
+but does not supply payment-provider credentials, financial rules or API shapes.
+Muse must update the authoritative contract; Codex must not invent those shapes
+or write migrations/core/agent routes. A client request can enter through the
+existing client/web intake; this does not presume a new client account in mobile.
+
+### Required business sequence
+
+1. A client or office creates a request for the client, retaining client identity,
+   contact/address, notes, photos and service details under linked stable IDs.
+2. Office routes the request either to an estimate or directly to a job.
+3. Estimate route: prepare a draft, office reviews that exact revision, then send
+   the approved version to the client. Changes invalidate prior approval. Whether
+   client acceptance is required before scheduling is awaiting user clarification.
+4. Job route: select an available qualified technician and valid appointment window;
+   atomically save both assignment and booking. The estimate route joins this stage
+   when its required approvals/acceptance have been met.
+5. Perform work, retain visit notes/photos and record work completion separately
+   from financial state. Tech or office may record payment received with permission;
+   completion must never fabricate a payment or overwrite an existing deposit.
+6. Work completion prepares exactly one linked invoice draft (or a visible failed
+   preparation state) from the approved scope, recorded work and applicable payment
+   records. Office reviews before sending it to the client; edits require re-review.
+7. Close the job only when the agreed closure criteria are satisfied. Whether an
+   unpaid receivable may remain at closure is awaiting user clarification. Closed
+   work enters the weekly accounting report, preserving links and revision history.
+
+Do not map this entire sequence onto jobs.status='completed'. Contract projections
+must distinguish work status, estimate review, scheduling, invoice review/send,
+payment balance and administrative closure. Partial payments, deposits, refunds,
+reopening and corrected invoices need auditable transitions rather than rewrites.
+
+### Dispatch calendar and emergency moves
+
+- Day/week technician lanes, clear job cards and month overview; available slots
+  come from active working hours, time off, skills, existing bookings, duration,
+  travel/buffers and multi-technician requirements. Missing data is unavailable or
+  unknown, never a free slot inferred from the current page of appointments.
+- Cards show the customer, job/service, address, named technician(s), full window,
+  priority and relevant unread-note/parts/customer-update indicators. Opening the
+  card keeps the same client/job context; moving it must not copy or detach notes.
+- Drag-and-drop previews old/new times and assigned technician(s), then submits a
+  versioned atomic move. Provide a Move appointment form for touch, keyboard and
+  assistive-technology use. Pending moves are not displayed as confirmed. Rejected
+  moves restore/reload the authoritative schedule and show conflict details.
+- For a job running long, propose a new end and show every affected appointment.
+  Moving several jobs requires an atomic reviewed change set or a documented safe
+  alternative; never leave a partially applied chain with overlapping bookings.
+- Emergency deposit received is a verified financial event linked to that job.
+  It surfaces an urgent dispatch item with valid slot/technician alternatives.
+  It must not silently displace existing bookings or bypass conflict checks.
+  Deposit thresholds, cleared/received semantics and priority rules need definition.
+- Confirm emergency changes with the dispatcher and create customer/technician
+  update obligations for each affected job. Track acknowledgement and delivery;
+  preserve unresolved impacts visibly until resolved. No automatic displacement
+  or customer messaging is enabled by this specification alone.
+
+### Invoice and payment handoff
+
+- Reuse client, service, approved scope/estimate, work records and linked payments;
+  no repeated manual copying of customer details or duplicate invoice drafts.
+- Office approval and send permissions enforced on the server for the exact
+  estimate/invoice revision. Technician UI exposes only permitted payment details,
+  never supplier costs, office expenses or profit/margin calculations.
+- Payment entry must distinguish a pending/unverified report from confirmed money
+  received, with amount/currency, method, receipt/reference, collector, timestamp,
+  allocation and reversal history. Repeated taps/provider events must be idempotent.
+- Record external payments versus process card payments is awaiting user choice.
+  No card data collection, provider choice, fees, tax rules or ledger formula is
+  assumed. Shared core/backend owns all financial calculations and reconciliation.
+- Weekly office/accounting reports link jobs, invoices, deposits, receipts, unpaid
+  balances, refunds and expenses; separately show earned/billed amounts and cash
+  collected so deposits are not double-counted as revenue. Accounting determines
+  recognition, tax, expense allocation, profit definitions and reporting cutoffs.
+  Missing costs produce incomplete figures, not an invented profit. Corrected or
+  reopened jobs retain an adjustment trail for previously issued reports.
+
+### Contract additions required from Muse
+
+Availability/technician projections; atomic book/move/extend/reassign APIs with
+revision and idempotency; conflict details; request-to-estimate/job transitions;
+versioned office approve/send APIs; safe completion/invoice-draft preparation;
+payment/deposit recording and verification; closure prerequisites; accounting
+report projection and role restrictions. Include failures, allowed roles and
+reconciliation behavior. This is a request for contract shapes, not a new parallel
+API contract defined by mobile.
+
+### Acceptance scenarios and implementation order
+
+1. Availability and clear appointment cards, then atomic booking/assignment.
+2. Accessible drag/move/extend and emergency-impact review with update tracking.
+3. Estimate review/send gates and separate work/payment/invoice/closure states.
+4. Idempotent invoice preparation, office review and payment reconciliation.
+5. Weekly accounting handoff and reconciliation against the source records.
+
+Verify two dispatchers competing for one slot; multi-tech all-or-nothing booking;
+long-job/emergency cascades; stale drag and network loss; reopened work; duplicate
+completion/deposit/payment callbacks; partial/full payment; changed estimates or
+invoices after approval; failed draft preparation and message delivery; and exact
+job/payment linkage in weekly reporting. “No overlaps” is an atomic backend rule
+plus tested behavior, not a promise made from the calendar’s appearance.
+
+Current implementation: read-only week/month/day agenda, client/service-linked job
+cards and detail, request/photo entry. Cards now show full recorded appointment
+windows or explicitly missing end times. Empty days no longer imply availability.
+Availability search, booking/moving, payment, invoice and closure actions remain
+unimplemented until the documented backend guarantees and policies are available.

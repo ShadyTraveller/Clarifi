@@ -26,7 +26,7 @@ export function JobCard({ job, showDate = false }: { job: WorkJob; showDate?: bo
   return <Pressable accessibilityRole="button" accessibilityLabel={`Open job for ${job.clientName}: ${job.request}`}
     onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: job.id } })} style={({ pressed }) => pressed && { opacity: 0.7 }}>
     <Card style={s.job}>
-      <View style={s.jobTop}><View style={s.time}><Icon name={job.scheduled_start ? 'clock' : 'calendar'} size={14} /><Text style={s.timeText}>{job.scheduled_start ? timeLabel(job.scheduled_start) : 'Not scheduled'}</Text></View>
+      <View style={s.jobTop}><View style={s.time}><Icon name={job.scheduled_start ? 'clock' : 'calendar'} size={14} /><Text style={s.timeText}>{job.scheduled_start ? `${timeLabel(job.scheduled_start)} – ${job.scheduled_end ? timeLabel(job.scheduled_end) : 'End time not set'}` : 'Not scheduled'}</Text></View>
         <View style={[s.status, complete && s.complete]}><Text style={[s.statusText, complete && s.completeText]}>{statusLabels[job.status]}</Text></View></View>
       <View style={s.clientRow}><Text style={s.client}>{job.clientName}</Text><Icon name="arrow-up-right" color={colors.muted} size={18} /></View>
       <Text style={s.request} numberOfLines={3}>{job.request}</Text>
