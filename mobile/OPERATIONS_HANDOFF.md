@@ -82,8 +82,10 @@ existing client/web intake; this does not presume a new client account in mobile
    contact/address, notes, photos and service details under linked stable IDs.
 2. Office routes the request either to an estimate or directly to a job.
 3. Estimate route: prepare a draft, office reviews that exact revision, then send
-   the approved version to the client. Changes invalidate prior approval. Whether
-   client acceptance is required before scheduling is awaiting user clarification.
+   the approved version to the client. Changes invalidate prior approval. Client
+   acceptance AND confirmed receipt of the required percentage deposit are required
+   before scheduling. Deposit percentage and direct/emergency-job application await
+   user clarification; do not choose a percentage in mobile.
 4. Job route: select an available qualified technician and valid appointment window;
    atomically save both assignment and booking. The estimate route joins this stage
    when its required approvals/acceptance have been met.
@@ -93,9 +95,10 @@ existing client/web intake; this does not presume a new client account in mobile
 6. Work completion prepares exactly one linked invoice draft (or a visible failed
    preparation state) from the approved scope, recorded work and applicable payment
    records. Office reviews before sending it to the client; edits require re-review.
-7. Close the job only when the agreed closure criteria are satisfied. Whether an
-   unpaid receivable may remain at closure is awaiting user clarification. Closed
-   work enters the weekly accounting report, preserving links and revision history.
+7. Close the job only after full payment is confirmed received and the required
+   office invoice review/send steps are satisfied. Unpaid or pending payments block
+   closure; completed work remains distinguishable from a closed job. Closed work
+   enters the weekly accounting report, preserving links and revision history.
 
 Do not map this entire sequence onto jobs.status='completed'. Contract projections
 must distinguish work status, estimate review, scheduling, invoice review/send,
@@ -137,9 +140,16 @@ reopening and corrected invoices need auditable transitions rather than rewrites
 - Payment entry must distinguish a pending/unverified report from confirmed money
   received, with amount/currency, method, receipt/reference, collector, timestamp,
   allocation and reversal history. Repeated taps/provider events must be idempotent.
-- Record external payments versus process card payments is awaiting user choice.
-  No card data collection, provider choice, fees, tax rules or ledger formula is
-  assumed. Shared core/backend owns all financial calculations and reconciliation.
+- User requires card processing inside the app, initially tested in a payment
+  provider sandbox. Stripe is the recommended candidate, not yet provisioned or
+  integrated. Provider-hosted/native payment UI handles card details; no raw card
+  numbers or CVC are saved in app state, logs or Supabase. Backend verifies payment
+  events and reconciles amounts/currency/job linkage before unlocking scheduling
+  or closure. A mobile success screen or pending authorization is not payment proof.
+  Keep sandbox transactions out of live balances, availability gates and reports.
+  Refunds/disputes after closure create explicit accounting exceptions and an audit
+  trail. Shared core/backend owns calculations; fees, taxes and ledger rules are
+  not invented by mobile.
 - Weekly office/accounting reports link jobs, invoices, deposits, receipts, unpaid
   balances, refunds and expenses; separately show earned/billed amounts and cash
   collected so deposits are not double-counted as revenue. Accounting determines
@@ -177,3 +187,30 @@ cards and detail, request/photo entry. Cards now show full recorded appointment
 windows or explicitly missing end times. Empty days no longer imply availability.
 Availability search, booking/moving, payment, invoice and closure actions remain
 unimplemented until the documented backend guarantees and policies are available.
+
+### Geographic dispatch planning
+
+Review jobs on the map and suggest grouping nearby work when appointments, skills,
+parts readiness and customer commitments permit. Include realistic travel time,
+breaks and configurable buffers; never optimize distance by silently moving a
+committed booking. Show the affected jobs and require dispatch confirmation with
+server conflict checks. Current technician locations are manual pins: show age
+and source, and do not describe them as live GPS. Routing suggestions and travel
+estimates remain unimplemented and require a documented data source.
+
+### Sandbox payment integration handoff
+
+Stripe sandbox is a candidate for testing deposits, final balances, declines,
+authentication, refunds and duplicate/delayed events without real charges. Use
+separate test data and sandbox keys. Only the provider publishable key belongs in
+mobile; secret and webhook-signing keys belong in secure server configuration.
+Muse must provide session-authenticated payment creation/status endpoints, signed
+webhook processing with idempotency, verified job/organization allocation and
+atomic enforcement of acceptance/deposit/full-payment gates. No agent-secret API
+calls from mobile. In-app card entry and in-person Tap to Pay/readers are distinct
+integrations; do not imply the latter is supplied by PaymentSheet.
+
+References: https://docs.stripe.com/sandboxes and
+https://docs.expo.dev/versions/latest/sdk/stripe/ . Testing is not launch readiness;
+live processing has fees and requires merchant onboarding. No provider account or
+payment integration was created by this requirements update.
