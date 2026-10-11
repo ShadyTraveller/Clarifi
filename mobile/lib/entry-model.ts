@@ -28,6 +28,16 @@ export function leadPayload(draft: EntryDraft, organizationId: string, clientId:
   const access = [draft.unit.trim() && `Unit ${draft.unit.trim()}`, draft.gate.trim() && `Gate ${draft.gate.trim()}`].filter(Boolean).join(', ');
   return { organization_id: organizationId, client_id: clientId, request: draft.request.trim(), details: [access, draft.details.trim()].filter(Boolean).join('\n\n') || null, status: 'lead' as const, service: draft.service };
 }
+export function requestPayload(draft: EntryDraft, organizationId: string, sourceRef: string) {
+  const contact = clientPayload(draft, organizationId);
+  const job = leadPayload(draft, organizationId, '');
+  return {
+    target_org: organizationId,
+    client_info: { name: contact.name, role: contact.relationship, email: contact.email, phone: contact.phone, address: contact.address },
+    job_info: { title: job.request, details: job.details, service: job.service, markdown: null, technician_id: null, latitude: null, longitude: null },
+    p_source_ref: sourceRef,
+  };
+}
 export function sanitizePhotoName(name: string) { return name.toLowerCase().replace(/[^a-z0-9.-]/g, '-') || 'photo.jpg'; }
 export function validatePhoto(size: number, mime: string) {
   if (!mime.startsWith('image/')) return 'Choose an image file.';

@@ -47,7 +47,7 @@ try {
   page.on('request', req => {
     const url = new URL(req.url());
     if (url.origin !== process.env.EXPO_PUBLIC_SUPABASE_URL || req.method() !== 'POST') return;
-    if (url.pathname === '/rest/v1/jobs') { jobWrites++; jobId = req.postDataJSON().id; }
+    if (url.pathname === '/rest/v1/rpc/create_clarifi_request') { jobWrites++; assert.ok(req.postDataJSON().p_source_ref); }
     if (url.pathname === '/rest/v1/job_files') fileWrites++;
   });
   stage = 'browser sign-in'; await signIn(page, 'YAVAMO_DISPATCH');
@@ -69,7 +69,9 @@ try {
   stage = 'browser save';
   await page.getByRole('button', { name: 'Save request', exact: true }).click();
   await page.getByRole('button', { name: 'Create another request', exact: true }).waitFor();
-  assert.equal(jobWrites, 1); assert.equal(fileWrites, 1); assert.ok(jobId);
+  assert.equal(jobWrites, 1); assert.equal(fileWrites, 1);
+  const created = await db.from('jobs').select('id').eq('organization_id', org).eq('request', title).single();
+  assert.equal(created.error, null); jobId = created.data.id;
   stage = 'browser detail and signed image';
   await page.getByRole('button', { name: 'Open request', exact: true }).click();
   await page.getByText(title, { exact: true }).waitFor();

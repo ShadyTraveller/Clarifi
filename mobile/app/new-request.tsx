@@ -21,11 +21,14 @@ async function photoBytes(photo: Pick<EntryPhoto, 'uri'>) {
 }
 export default function NewRequest() {
   const { member } = useAuth();
-  return member && member.role !== 'technician' ? <EntryForm key={member.id} /> : null;
+  const entry = useEntry();
+  if (!member || member.role === 'technician') return null;
+  if (!entry.ready) return <ScrollView contentContainerStyle={pageStyles.page}><Card><Text style={s.hint}>{entry.error ?? 'Checking for an unfinished request…'}</Text>{entry.error && <Button label="Restore request" secondary onPress={entry.reload} />}</Card></ScrollView>;
+  return <EntryForm key={member.id} />;
 }
 function EntryForm() {
   const { db, member } = useAuth();
-  const { state, setState, reset, controller } = useEntry();
+  const { state, setState, checkpoint, reset, controller } = useEntry();
   const { draft, client, photos, attemptId, jobId } = state;
   const wide = useWindowDimensions().width >= 1180;
   const [errors, setErrors] = useState<ReturnType<typeof validateEntry>>({});
@@ -90,27 +93,34 @@ function EntryForm() {
     if (pending.current || picking) return;
     const invalid = validateEntry(draft); setErrors(invalid);
     if (Object.keys(invalid).length) { setMessage('Check the highlighted fields before saving.'); return; }
-    if (!client) { setMessage('Check for an existing client and choose a match before saving. New clients are temporarily unavailable.'); return; }
     pending.current = true; setBusy(true); setMessage('');
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     const id = attemptId ?? randomUUID();
     setState(previous => ({ ...previous, attemptId: id }));
     try {
-      const savedId = jobId ?? await createLead(db!, member!, draft, client, id, abort.signal);
-      setState(previous => ({ ...previous, jobId: savedId }));
+      let recoverable = await checkpoint({ ...state, attemptId: id }, abort.signal);
+      const saved = await createLead(db!, member!, recoverable.draft, id, abort.signal);
+      recoverable = await checkpoint({ ...recoverable, jobId: saved.jobId, savedClientId: saved.clientId }, abort.signal);
       let failed = 0;
-      for (const photo of photos.filter(item => !item.saved)) {
+      for (const photo of recoverable.photos.filter(item => !item.saved)) {
         abort.signal.throwIfAborted();
         try {
           const bytes = await photoBytes(photo);
-          await uploadEntryPhoto(db!, member!, savedId, client.id, photo, bytes, abort.signal);
-          setState(previous => ({ ...previous, photos: previous.photos.map(item => item.id === photo.id ? { ...item, saved: true } : item) }));
+          await uploadEntryPhoto(db!, member!, saved.jobId, saved.clientId, photo, bytes, abort.signal);
+          recoverable = await checkpoint({ ...recoverable, photos: recoverable.photos.map(item => item.id === photo.id ? { ...item, saved: true } : item) }, abort.signal);
         } catch { if (abort.signal.aborted) throw new Error('Cancelled'); failed++; }
       }
       if (!abort.signal.aborted) setMessage(failed ? 'Request saved. Some photos could not be attached. Retry photos to finish; this will not create another request.' : 'Request saved. Dispatch can now review and schedule it.');
     } catch (failure) {
       if (!abort.signal.aborted) setMessage(failure instanceof Error ? failure.message : 'Could not confirm the save. Your entry is kept.');
     } finally { pending.current = false; setBusy(false); }
+  }
+  async function startAnother() {
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    try { await reset(); setChecked(false); setMatches([]); setMessage(''); setErrors({}); }
+    catch { setMessage('Could not clear the saved entry. Try again before starting another request.'); }
+    finally { pending.current = false; setBusy(false); }
   }
   const remaining = photos.filter(photo => !photo.saved).length;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -128,7 +138,7 @@ function EntryForm() {
           <Text style={s.label}>Relationship</Text><View accessibilityRole="radiogroup" accessibilityLabel="Client relationship" style={s.choices}>{Object.entries(relationships).map(([value, label]) => <Choice key={value} label={label} selected={draft.relationship === value} disabled={locked || !!client} onPress={() => update('relationship', value)} />)}</View>
           {client ? <View style={s.match}><Icon name="check" color={colors.green} size={18} /><Text style={[s.hint, { flex: 1 }]}>Existing client selected. Their contact details stay unchanged.</Text>{!locked && <Button label="Change client" secondary onPress={() => { setState(previous => ({ ...previous, client: null })); setChecked(false); }} />}</View> : <>
             <Button label="Check existing client" secondary icon="search" busy={busy && !attemptId} disabled={locked} onPress={checkClient} />
-            {checked && !matches.length && <Text accessibilityLiveRegion="polite" style={s.hint}>No matching client found. New clients are temporarily unavailable; contact dispatch or check another email or phone.</Text>}
+            {checked && !matches.length && <Text accessibilityLiveRegion="polite" style={s.hint}>No matching client found. Saving will create this client if no match exists.</Text>}
             {matches.length > 0 && <View style={s.matches}><Text style={s.label}>Choose the client for this request</Text>{matches.map(match => <Pressable key={match.id} accessibilityRole="button" accessibilityLabel={`Use client ${match.name}`} onPress={() => chooseClient(match)} style={s.matchOption}><Text style={s.matchName}>{match.name}</Text><Text style={s.hint}>{match.email || match.phone || 'Existing client'}</Text><Text style={s.hint}>{match.address || 'No address provided'}</Text></Pressable>)}</View>}
           </>}
         </Card></View>
@@ -146,9 +156,9 @@ function EntryForm() {
         </Card></View>
       </View>
       {!!message && <Card style={jobId ? s.success : s.notice}><Text accessibilityRole="alert" style={s.hint}>{message}</Text></Card>}
-      {attemptId && !jobId && <Text style={s.hint}>This save is still unconfirmed. Retry checks the same request. Your entry is kept when you switch screens.</Text>}
+      {attemptId && !jobId && <Text style={s.hint}>This save is still unconfirmed. Retry checks the same request.</Text>}
       <View style={s.footer}><Text style={[s.hint, { flex: 1 }]}>Requests start in the queue. Scheduling and assignment come later.</Text>
-        {!jobId || remaining ? <Button label={jobId ? 'Retry photos' : attemptId ? 'Retry save' : 'Save request'} icon="arrow-right" busy={busy} disabled={picking || !client} onPress={() => { void submit(); }} /> : <Button label="Create another request" icon="plus" onPress={() => { reset(); setChecked(false); setMatches([]); setMessage(''); setErrors({}); }} />}
+        {!jobId || remaining ? <Button label={jobId ? 'Retry photos' : attemptId ? 'Retry save' : 'Save request'} icon="arrow-right" busy={busy} disabled={picking} onPress={() => { void submit(); }} /> : <Button label="Create another request" icon="plus" busy={busy} onPress={() => { void startAnother(); }} />}
       </View>
     </ScrollView>
   </KeyboardAvoidingView>;

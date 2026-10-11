@@ -23,8 +23,8 @@ function required(name) {
 const db = createClient(required('EXPO_PUBLIC_SUPABASE_URL'), required('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'),
   { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 const org = required('YAVAMO_TEST_ORG_A'), clientId = required('YAVAMO_TEST_CLIENT_ID');
-const jobId = randomUUID(), photoId = randomUUID(), title = `TEST mobile entry ${jobId}`;
-const path = `${jobId}/${photoId}-verification.png`;
+const sourceRef = randomUUID(), photoId = randomUUID(), title = `TEST mobile entry ${sourceRef}`;
+let jobId, path;
 const signal = AbortSignal.timeout(120000);
 const bytes = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64')).buffer;
 let stage = 'sign-in', loggedIn = false, attempted = false, failed = false;
@@ -43,7 +43,7 @@ try {
   assert.equal(contact.error, null); assert.ok(/^test(?:[\s:_-]|$)/i.test(contact.data.name));
   if (!contact.data.email?.trim() && !contact.data.phone?.trim()) {
     stage = 'temporary TEST contact setup'; originalEmail = contact.data.email;
-    fixtureEmail = `mobile-${jobId}@example.invalid`;
+    fixtureEmail = `mobile-${sourceRef}@example.invalid`;
     let setup = db.from('clients').update({ email: fixtureEmail }).eq('organization_id', org).eq('id', clientId);
     setup = originalEmail === null ? setup.is('email', null) : setup.eq('email', originalEmail);
     const updated = await setup.select('id,email').single();
@@ -51,12 +51,15 @@ try {
     contact.data.email = fixtureEmail;
   }
   const draft = { ...emptyEntry, name: contact.data.name, email: contact.data.email ?? '', phone: contact.data.phone ?? '',
-    request: title, service: 'security_film', unit: 'TEST', gate: 'TEST', details: 'Synthetic mobile verification. No action required.' };
+    address: contact.data.address ?? '', relationship: contact.data.relationship ?? 'other', request: title, service: 'security_film', unit: 'TEST', gate: 'TEST', details: 'Synthetic mobile verification. No action required.' };
   stage = 'contact matching';
   assert.ok((await findClients(db, member, draft, signal)).some(row => row.id === clientId));
   stage = 'lead save and retry'; attempted = true;
-  assert.equal(await createLead(db, member, draft, contact.data, jobId, signal), jobId);
-  assert.equal(await createLead(db, member, draft, contact.data, jobId, signal), jobId);
+  const first = await createLead(db, member, draft, sourceRef, signal);
+  jobId = first.jobId; path = `${jobId}/${photoId}-verification.png`;
+  assert.equal(first.clientId, clientId);
+  const retries = await Promise.all([createLead(db, member, draft, sourceRef, signal), createLead(db, member, draft, sourceRef, signal)]);
+  retries.forEach(result => assert.deepEqual(result, first));
   const job = await db.from('jobs').select('id,status,service,client_id,technician_id,assigned_to,scheduled_start,latitude,longitude,details')
     .eq('organization_id', org).eq('id', jobId).single();
   assert.equal(job.error, null); assert.equal(job.data.status, 'lead'); assert.equal(job.data.service, 'security_film');
@@ -88,7 +91,12 @@ try {
 } catch {
   failed = true; console.error(`Live entry verification failed at ${stage}. No credentials or API responses are logged.`);
 } finally {
-  if (attempted) {
+  if (attempted && !jobId) {
+    const recovered = await db.from('jobs').select('id').eq('organization_id', org).eq('request', title);
+    if (recovered.error || recovered.data.length > 1) { failed = true; console.error('Could not reconcile TEST cleanup.'); }
+    else if (recovered.data.length === 1) { jobId = recovered.data[0].id; path = `${jobId}/${photoId}-verification.png`; }
+  }
+  if (jobId) {
     const removedObject = await db.storage.from('job-files').remove([path]);
     const removedMetadata = await db.from('job_files').delete().eq('organization_id', org).eq('job_id', jobId).eq('id', photoId);
     const removedJob = await db.from('jobs').delete().eq('organization_id', org).eq('id', jobId).eq('request', title);

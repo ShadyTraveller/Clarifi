@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Membership } from './model';
-import { leadPayload, normalizeEmail, phoneDigits, sameContact, validatePhoto, type ClientMatch, type EntryDraft, type EntryPhoto } from './entry-model';
+import { requestPayload, normalizeEmail, phoneDigits, sameContact, validatePhoto, type ClientMatch, type EntryDraft, type EntryPhoto } from './entry-model.ts';
 
 const clientColumns = 'id,name,email,phone,address,relationship';
 // The contract's digits-only substring does not match formatted stored numbers.
@@ -34,22 +34,24 @@ export async function verifyEntryAccess(db: SupabaseClient, member: Membership, 
   if (response.error || !response.data || !['owner', 'admin', 'dispatcher', 'office'].includes(response.data.role)) throw new Error('Your workspace access changed. Contact dispatch.');
   signal.throwIfAborted();
 }
-export async function createLead(db: SupabaseClient, member: Membership, draft: EntryDraft, client: ClientMatch | null, jobId: string, signal: AbortSignal) {
-  // No client INSERT fallback: only Muse can provide atomic normalized dedupe.
-  if (!client) throw new Error('New clients are temporarily unavailable. Choose an existing client or contact dispatch.');
+export async function createLead(db: SupabaseClient, member: Membership, draft: EntryDraft, sourceRef: string, signal: AbortSignal) {
   await verifyEntryAccess(db, member, signal);
-  const contact = await db.from('clients').select('id').eq('organization_id', member.organization_id).eq('id', client.id).abortSignal(signal).maybeSingle();
-  if (contact.error || !contact.data) throw new Error('This client is no longer available. Check the client again.');
-  // A stable primary key reconciles uncertain responses and repeated taps.
-  const prior = await db.from('jobs').select('id,client_id').eq('organization_id', member.organization_id).eq('id', jobId).abortSignal(signal).maybeSingle();
-  if (prior.error) throw new Error('Could not confirm whether this request was saved. Retry to check it safely.');
-  if (prior.data) {
-    if (prior.data.client_id !== client.id) throw new Error('Could not verify this request. Contact dispatch.');
-    return prior.data.id as string;
+  // Always use the four-argument overload. Never retry through the old wrapper
+  // or raw table inserts: both would bypass source-ref replay guarantees.
+  const response = await db.rpc('create_clarifi_request', requestPayload(draft, member.organization_id, sourceRef)).abortSignal(signal);
+  if (response.error) {
+    if (response.error.code === 'PGRST202') throw new Error('Request saving is awaiting a server update. Your entry is kept. Retry after dispatch confirms it is ready.');
+    if (response.error.code === '42501') throw new Error('You no longer have permission to create requests in this workspace. Contact dispatch.');
+    throw new Error('Could not confirm the save. Retry uses the same request reference, without creating another.');
   }
-  const response = await db.from('jobs').insert({ id: jobId, ...leadPayload(draft, member.organization_id, client.id) }).select('id').abortSignal(signal).single();
-  if (response.error || !response.data) throw new Error('Could not confirm the save. Retry checks the same request, without creating another.');
-  return response.data.id as string;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof response.data !== 'string' || !uuid.test(response.data)) throw new Error('Could not confirm the saved request. Retry to check it safely.');
+  // The returned job UUID is not the source reference. Resolve the actual client
+  // selected by server-side dedupe before associating any photo metadata.
+  const job = await db.from('jobs').select('id,client_id').eq('organization_id', member.organization_id)
+    .eq('id', response.data).abortSignal(signal).single();
+  if (job.error || !job.data || !uuid.test(job.data.client_id)) throw new Error('The save needs confirmation. Retry to retrieve the same request and its client.');
+  return { jobId: job.data.id as string, clientId: job.data.client_id as string };
 }
 export async function uploadEntryPhoto(db: SupabaseClient, member: Membership, jobId: string, clientId: string, photo: EntryPhoto, bytes: ArrayBuffer, signal: AbortSignal) {
   const failure = validatePhoto(bytes.byteLength, photo.mime);

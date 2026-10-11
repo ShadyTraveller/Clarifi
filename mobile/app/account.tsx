@@ -3,15 +3,21 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { useEntry } from '../lib/entry-context';
 import { colors, fonts } from '../lib/theme';
 
 export default function Account() {
   const { db, member, session, memberships, selectWorkspace } = useAuth();
+  const entry = useEntry();
+  const unfinished = !!entry.state.attemptId && (!entry.state.jobId || entry.state.photos.some(photo => !photo.saved));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function signOut() {
     if (!db || busy) return;
     setBusy(true); setError('');
     try {
+      // Keep uncertain saves scoped to this user/workspace for a safe retry
+      // after reauthentication. Completed entries can be removed on sign-out.
+      if (entry.ready && !unfinished) await entry.reset();
       const result = await db.auth.signOut({ scope: 'local' });
       if (result.error) throw result.error;
       // Expo Router's protected route returns to the dashboard/sign-in screen.
@@ -27,6 +33,7 @@ export default function Account() {
     </Card>
     {memberships.length > 1 && <Card><Text style={s.section}>Switch workspace</Text>{memberships.map(workspace => <View key={workspace.id} style={{ marginTop: 12 }}><Button label={workspace.organizationName} secondary disabled={workspace.id === member?.id} onPress={() => { selectWorkspace(workspace.id); router.dismissTo('/'); }} /></View>)}</Card>}
     <Text style={s.help}>Your administrator manages roles and team access.</Text>
+    {unfinished && <Text style={s.help}>An unfinished request is saved on this device. Sign back into this workspace to finish it.</Text>}
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <Button label="Sign out of this device" icon="log-out" secondary busy={busy} onPress={signOut} />
   </ScrollView>;

@@ -53,9 +53,9 @@ changing configuration. Never distribute a synthetic build as a live app.
   film key is `security_film`, confirmed by the updated mobile contract.
 - Refresh on focus, pull-to-refresh, and every minute while foregrounded. Failed
   refreshes visibly label stale data; no fabricated live GPS or live queue status.
-- Quick-entry creates lead jobs for existing clients and attaches photos. It
-  calls no `/api/agents/*` endpoints. New-client inserts are disabled pending
-  atomic normalized dedupe from Muse; see `ENTRY_HANDOFF.md`.
+- Quick-entry uses the four-argument `create_clarifi_request` RPC for new and
+  existing clients and attaches photos. Live saving requires Muse’s migration
+  `202610100005`; see `ENTRY_HANDOFF.md`. It calls no agent endpoints.
 - No pricing math is implemented. Future estimate work must use the shared engine.
 
 ## Live verification on the existing project
@@ -170,38 +170,35 @@ unit/gate instructions, and optional camera/library images (4 MB each). Save
 creates an unscheduled, unassigned lead. Photos upload to private `job-files`;
 only paths and metadata are saved. Job details generate one-hour signed URLs.
 
-Retries keep the same request and photo IDs, including after switching screens.
-An unconfirmed save locks the entry until reconciled. Failed attachments can be
-retried without creating another job. The draft is memory-only and clears on
-workspace change/sign-out; restarting the app discards it. No offline queue is
-implemented. Native camera/gallery permissions require Android device testing.
+Retries keep the same `p_source_ref` and photo IDs. Before the RPC, mobile saves
+recovery data to scoped device storage: encrypted metadata plus private photo
+copies on native, IndexedDB metadata/photo blobs on web. Unfinished saves resume
+after app restart or reauthentication in the same user/workspace. Completed
+entries clear on explicit sign-out or Create another request. Unsaved edits
+before the first save are memory-only. This is manual recovery, not an automatic
+offline queue. Native camera/gallery and restart behavior need device testing.
 
-Run `tests/entry-browser.cjs` against the synthetic export described above. It
-checks formatted-phone/case-insensitive-email matching, extension warnings,
-restricted write shapes, lost job/upload/metadata responses, draft resumption,
-signed photo viewing, and responsive widths. It never writes live data.
+The RPC returns the job UUID; mobile reads its canonical client ID and uses both
+for attachments. It never assumes the job ID equals `p_source_ref`, and never
+falls back to the old three-argument wrapper or raw lead/client inserts.
+Owner maps to `other`; Institution fallback is the backend RPC’s responsibility.
 
-Owner maps to `other` as Muse confirmed. All four service choices can save leads
-for existing clients, including `security_film`. New-client creation remains
-disabled while Muse corrects the documented RPC's authorization, concurrency,
-contact preservation, and retry behavior. Institution also needs live enum support.
+`tests/entry-browser.cjs` uses synthetic responses to check new/existing clients,
+four-argument payloads, lost RPC/upload/metadata responses, restart recovery,
+durable photos, full storage before any RPC, actual server IDs, signed photo
+viewing, completed-entry sign-out cleanup, and responsive widths.
 
-`tests/entry-live.mjs` verifies signed-in lead/photo writes, safe retries, signed
-downloads, scoped job details, and unchanged contact data using an existing
-labelled TEST client. Supply `YAVAMO_TEST_ORG_A`, `YAVAMO_TEST_CLIENT_ID`, public
-project configuration, and dispatcher credentials through runtime settings.
-The script uses Node 24 with `--experimental-strip-types`. It temporarily assigns
-an email only if the TEST fixture has no contact, restores that field, and removes
-only the generated job/photo. Never run it against a customer client.
+Live verification is pending migration `202610100005`. Read-only inspection on
+2026-10-11 still found only the old three-argument RPC in the configured project.
+Previous live API/browser passes verified the earlier direct-write implementation;
+they do not validate this RPC switch.
 
-Live API verification passed for existing-client film leads and photos; this
-does not certify new-client RPC behavior, native camera permissions, or the full
-backend authorization model.
-
-`tests/entry-live-browser.cjs` checks the same flow through a live-configured web
-export: sign-in → contact lookup → film request/photo → saved job detail. It
-verifies the image actually displays, confirms persisted data, checks draft reset
-after sign-out, and verifies technicians have no entry action. Supply the same
-runtime settings plus `PLAYWRIGHT_MODULE`, `CHROME_PATH`, and `TEST_BASE_URL`.
-It uses the same TEST-only fixture and cleanup rules. The complete live browser
-flow passed; it performs no new-client RPC calls.
+After deployment, run `tests/entry-live.mjs` and `tests/entry-live-browser.cjs`
+against a labelled TEST client with runtime-only `YAVAMO_TEST_ORG_A`,
+`YAVAMO_TEST_CLIENT_ID`, dispatcher/technician credentials, and public Supabase
+configuration. Credentials belong outside this Expo project. The API test uses
+Node 24 `--experimental-strip-types`; the browser test also needs
+`PLAYWRIGHT_MODULE`, `CHROME_PATH`, and `TEST_BASE_URL`. Both scripts restore a
+temporary TEST contact email and remove their generated job/photo. The API test
+checks concurrent same-reference retries; new-client dedupe and authorization
+still need separate live verification after the migration is applied.
