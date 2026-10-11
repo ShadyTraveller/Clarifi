@@ -149,3 +149,98 @@ Key tables (all org-scoped):
 - **Codex owns:** everything under `mobile/`.
 - Keep PRs small (one screen or one feature). PR description states what was
   built, what was stubbed, and the manual test steps on Android.
+
+## 9. Client quick-entry — write shapes & photo rules (Muse-confirmed 2026-10-10)
+
+### Client dedupe (REQUIRED)
+Before inserting a client, search for an existing one. **Never create a
+duplicate.** Match on email (case-insensitive) OR phone digits:
+```typescript
+// 1. Normalize
+const emailNorm = email?.toLowerCase().trim() || null;
+const phoneDigits = phone?.replace(/\D/g, '') || null;
+// 2. Search (most recent first)
+const { data: existing } = await supabase
+  .from('clients')
+  .select('id')
+  .eq('organization_id', orgId)
+  .or(`email.ilike.${emailNorm},phone.ilike.%${phoneDigits}%`)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+// 3. Reuse existing.id, or insert new
+```
+If found: use the existing client ID for the job. Optionally fill blank
+fields (don't overwrite existing data).
+
+**Atomic option (recommended):** call the `create_clarifi_request` RPC instead
+of manual read-then-insert. It does find-or-create atomically server-side:
+```typescript
+const { data: jobId, error } = await supabase.rpc('create_clarifi_request', {
+  target_org: orgId,
+  client_info: { name, role, email, phone, address },
+  job_info: { title, details, service, markdown: null, technician_id: null, latitude: null, longitude: null },
+});
+// Returns the new job's UUID. Client dedupe handled inside.
+```
+Requires migration `202610100003` applied. Falls back to manual dedupe if
+the RPC is unavailable.
+
+### Client insert shape
+```typescript
+{
+  organization_id: string,  // from user's active membership
+  name: string,             // required
+  email: string | null,
+  phone: string | null,     // store as-is; UI flags extensions ("ask for direct line")
+  address: string | null,   // street address (unit/gate in job details, see below)
+  relationship: 'tenant' | 'landlord' | 'property_management'
+            | 'institution' | 'commercial' | 'other',
+}
+```
+**Role mapping:** UI "Owner" → DB `other` (no `owner` enum value; the RPC
+downgrades it automatically). UI "Institution" → DB `institution` (requires
+migration `202610050001` applied; otherwise downgraded to `other`).
+
+### Job insert shape (quick-entry always creates status='lead')
+```typescript
+{
+  organization_id: string,
+  client_id: string,        // from dedupe above
+  request: string,          // short title/summary (required)
+  details: string | null,   // full description; PREPEND unit/gate code here:
+                            // "Unit 4B, Gate 1234\n\n<job details>"
+  status: 'lead',           // always 'lead' for quick-entry
+  service: 'doors' | 'security_film' | 'locksmith' | 'skincare' | null,
+}
+```
+Do NOT set: `technician_id` (office assigns), `latitude`/`longitude` (leave
+null; backend geocodes on web/agent intake — mobile v1 skips geocoding).
+
+### Photo storage rules
+1. Bucket: `job-files` (Supabase Storage).
+2. Path: `{jobId}/{uuid}-{sanitized_filename}` — sanitize: lowercase,
+   replace `[^a-z0-9.-]` with `-`, max 4MB per photo, images only.
+3. After upload, insert into `job_files`:
+```typescript
+{
+  organization_id: string,
+  job_id: string,
+  client_id: string | null,  // optional; set if known
+  storage_path: string,      // the path from step 2 (NOT a public URL)
+  file_name: string,         // sanitized original name
+  mime_type: string | null,  // e.g. 'image/jpeg'
+}
+```
+4. **Never store public URLs.** The app generates signed URLs at view time
+   via `supabase.storage.from('job-files').createSignedUrl(path, 3600)`.
+5. RLS: `job_files` inherits org scoping via `private.is_org_member`.
+   Storage bucket `job-files` must allow authenticated reads/writes for org
+   members (backend owns bucket policies).
+
+### What mobile must NOT write
+- `supplier_materials` — office-only (RLS denies technicians as of
+  migration 202610100004).
+- `organization_members` — admin-only writes (RLS denies non-admins).
+- `invoices` — read-only on mobile (office sends).
+- `quotes` with `source='agent'` — read-only; office reviews.
