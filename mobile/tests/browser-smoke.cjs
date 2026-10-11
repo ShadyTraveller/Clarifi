@@ -35,6 +35,11 @@ async function scenario(browser, role, options = {}) {
       const membership = { id: membershipId, organization_id: orgA, user_id: userId, role, display_name: 'Jamie', organizations: { name: 'Yavamo Toronto' } };
       return reply(options.multi ? [membership, { ...membership, id: membershipId + 'b', organization_id: orgB, organizations: { name: 'Yavamo East' } }] : [membership]);
     }
+    if (table === 'job_files') {
+      assert.equal(url.searchParams.get('organization_id'), 'eq.' + orgA);
+      assert.equal(url.searchParams.get('job_id'), 'eq.job-a');
+      return reply([], 200, { 'content-range': '*/0', 'access-control-expose-headers': 'content-range' });
+    }
     const org = url.searchParams.get('organization_id');
     assert.ok([`eq.${orgA}`, `eq.${orgB}`].includes(org), 'Every operational query must scope its organization');
     orgs.push(org);

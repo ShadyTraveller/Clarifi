@@ -5,7 +5,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "types": ["react", "react-native", "node"],
-    "paths": { "@yavamo/core": ["../packages/core/src"] }
+    "paths": { "@yavamo/core": ["../packages/core/src"], "@yavamo/core/*": ["../packages/core/src/*"] }
   },
   "include": ["app/**/*.tsx", "components/**/*.tsx", "lib/**/*.ts", "lib/**/*.tsx", "tests/**/*.ts", "expo-env.d.ts"]
 }

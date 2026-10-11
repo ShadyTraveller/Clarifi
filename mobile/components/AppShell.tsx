@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { width } = useWindowDimensions();
   const wide = width >= 840;
-  const active = path.startsWith('/jobs/') ? '/work' : path;
+  const active = path.startsWith('/jobs/') || path === '/new-request' ? '/work' : path;
   return <View style={s.shell}>
     {member && <View style={s.command}>
       <View style={s.brandRow}><View style={s.mark}><Text style={s.letter}>y</Text></View><View style={s.identity}>

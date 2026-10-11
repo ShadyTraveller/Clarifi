@@ -30,7 +30,9 @@ export async function fetchWork(db: SupabaseClient, member: Membership, signal: 
   status?: JobStatus; start?: string; end?: string; id?: string; page?: number; search?: string;
 }) {
   const filter = await technicianFilter(db, member, signal);
-  let query = db.from('jobs').select(jobDisplayColumns, { count: 'exact' })
+  const detailColumns = `${jobDisplayColumns},details` as const;
+  const columns = options.id ? detailColumns : jobDisplayColumns;
+  let query = db.from('jobs').select(columns, { count: 'exact' })
     .eq('organization_id', member.organization_id).in('service', serviceKeys);
   if (filter) query = query.or(filter);
   if (options.status) query = query.eq('status', options.status);
@@ -41,8 +43,9 @@ export async function fetchWork(db: SupabaseClient, member: Membership, signal: 
   query = query.order('scheduled_start', { nullsFirst: false }).order('id');
   const page = options.page ?? 0;
   // Calendar also paginates rather than silently dropping appointments at the API row limit.
-  const response = await query.range(page * workPageSize, (page + 1) * workPageSize - 1).abortSignal(signal);
+  const response = await query.range(page * workPageSize, (page + 1) * workPageSize - 1).abortSignal(signal)
+    .overrideTypes<Omit<WorkJob, 'clientName' | 'address'>[], { merge: false }>();
   if (response.error) throw new Error('Could not load work. Check your connection and try again.');
-  const jobs = await withClients(db, member, (response.data ?? []) as Omit<WorkJob, 'clientName' | 'address'>[], signal);
+  const jobs = await withClients(db, member, response.data ?? [], signal);
   return { jobs, total: response.count ?? jobs.length };
 }

@@ -3,7 +3,8 @@
 Android-first Expo app for dispatch and technicians. This feature implements
 email/password sign-in, encrypted native session persistence, workspace selection,
 the dashboard, responsive navigation, week/month calendar with a daily agenda,
-paginated work lists, read-only job details, and account/sign-out. Scheduling
+paginated work lists, job details with signed photo viewing, existing-client
+quick-entry, and account/sign-out. Scheduling
 and assignments remain manual; assignment editing is a subsequent feature.
 
 ## Run
@@ -52,7 +53,9 @@ changing configuration. Never distribute a synthetic build as a live app.
   film key is `security_film` (the contract's illustrative snippet uses a hyphen).
 - Refresh on focus, pull-to-refresh, and every minute while foregrounded. Failed
   refreshes visibly label stale data; no fabricated live GPS or live queue status.
-- This feature performs no job writes and calls no `/api/agents/*` endpoints.
+- Quick-entry creates lead jobs for existing clients and attaches photos. It
+  calls no `/api/agents/*` endpoints. New-client inserts are disabled pending
+  atomic normalized dedupe from Muse; see `ENTRY_HANDOFF.md`.
 - No pricing math is implemented. Future estimate work must use the shared engine.
 
 ## Live verification on the existing project
@@ -139,10 +142,11 @@ header stays visible; the active destination is labelled and highlighted.
 - **Job detail:** request, client name/address, appointment time, and current
   status. Detail requests reuse the organization and technician assignment
   filters, including direct links. Missing or unavailable jobs have a clear
-  empty state. Notes/photos and status mutation/completion guards remain pending.
+  empty state. Request details and image attachments are visible; notes threads
+  and status mutation/completion guards remain pending.
 - **Account:** workspace selection, role display, and sign-out.
 
-Client quick-entry, manual map, agent-output feed, assignment editing, invoice
+New-client creation, manual map, agent-output feed, assignment editing, invoice
 boards, and full notes/files workflows remain subsequent contract features.
 No placeholder navigation links are presented as working actions.
 
@@ -156,3 +160,23 @@ Live browser checks also pass for both approved roles across Home, Schedule,
 Work status filters, Account, and sign-out. No business records were changed
 during these checks. Android export passes; device behavior and the backend
 authorization review remain separate verification items.
+
+## Quick-entry verification
+
+Office accounts can open **New request** from Home or Work. Enter an existing
+client's email or phone, check matches, and choose the correct client. Contact
+details are retained; quick-entry does not overwrite them. Add a title, details,
+unit/gate instructions, and optional camera/library images (4 MB each). Save
+creates an unscheduled, unassigned lead. Photos upload to private `job-files`;
+only paths and metadata are saved. Job details generate one-hour signed URLs.
+
+Retries keep the same request and photo IDs, including after switching screens.
+An unconfirmed save locks the entry until reconciled. Failed attachments can be
+retried without creating another job. The draft is memory-only and clears on
+workspace change/sign-out; restarting the app discards it. No offline queue is
+implemented. Native camera/gallery permissions require Android device testing.
+
+Run `tests/entry-browser.cjs` against the synthetic export described above. It
+checks formatted-phone/case-insensitive-email matching, extension warnings,
+restricted write shapes, lost job/upload/metadata responses, draft resumption,
+signed photo viewing, and responsive widths. It never writes live data.

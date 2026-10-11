@@ -11,6 +11,7 @@ export function Button({ label, onPress, busy = false, secondary = false, icon, 
   label: string; onPress(): void; busy?: boolean; secondary?: boolean; icon?: IconName; disabled?: boolean;
 }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: busy || disabled, busy }}
+    aria-disabled={busy || disabled} aria-busy={busy}
     disabled={busy || disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, secondary ? styles.secondary : styles.primary, (pressed || busy || disabled) && { opacity: 0.65 }]}>
     {busy ? <ActivityIndicator color={colors.ink} /> : icon ? <Icon name={icon} /> : null}

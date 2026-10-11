@@ -17,7 +17,7 @@ export type DashboardJob = {
   clientName: string; address: string | null;
 };
 export type DashboardData = { jobs: DashboardJob[]; unassigned: number | null; alerts: number | null; checkedAt: Date };
-export type WorkJob = Omit<DashboardJob, 'scheduled_start'> & { scheduled_start: string | null };
+export type WorkJob = Omit<DashboardJob, 'scheduled_start'> & { scheduled_start: string | null; details?: string | null };
 export const jobStatuses = ['lead', 'estimate', 'active', 'completed'] as const;
 export type JobStatus = typeof jobStatuses[number];
 export const statusLabels: Record<JobStatus, string> = { lead: 'Request', estimate: 'Estimate', active: 'Job', completed: 'Completed' };

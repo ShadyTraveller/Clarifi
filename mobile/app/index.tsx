@@ -49,7 +49,7 @@ function Dashboard({ member }: { member: Membership }) {
         <Text style={s.eyebrow}>{tech ? 'FIELD TEAM' : 'DISPATCH DASHBOARD'}</Text>
         <Text style={s.title}>{tech ? 'Your day, sorted.' : 'Keep the day moving.'}</Text>
         <Text style={s.date}>{dayLabel()} · Toronto time</Text>
-        <View style={s.actions}><Button label="View schedule" icon="calendar" onPress={() => router.dismissTo('/schedule')} /><Button label="Browse work" secondary icon="briefcase" onPress={() => router.dismissTo('/work')} /></View>
+        <View style={s.actions}>{!tech && <Button label="New request" icon="plus" onPress={() => router.dismissTo('/new-request')} />}<Button label="View schedule" secondary icon="calendar" onPress={() => router.dismissTo('/schedule')} /><Button label="Browse work" secondary icon="briefcase" onPress={() => router.dismissTo('/work')} /></View>
       </View>
       <View accessibilityLiveRegion="polite" style={s.signal}>
         <View style={[s.dot, { backgroundColor: error ? colors.red : data ? colors.green : colors.muted }]} />

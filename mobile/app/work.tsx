@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../lib/auth';
 import { fetchWork } from '../lib/jobs';
 import { jobStatuses, type JobStatus } from '../lib/model';
 import { useWorkspaceQuery } from '../lib/use-workspace-query';
 import { colors, fonts } from '../lib/theme';
-import { Card, Icon, StateMessage } from '../components/ui';
+import { Button, Card, Icon, StateMessage } from '../components/ui';
 import { JobList, PageControls, PageHeading, QueryState, pageStyles } from '../components/WorkUI';
 
 const labels = { lead: 'Requests', estimate: 'Estimates', active: 'Jobs', completed: 'Completed' };
@@ -22,6 +23,7 @@ function WorkList() {
   function submitSearch() { setSearch(input.trim()); setPage(0); }
   return <ScrollView testID="work-screen" keyboardShouldPersistTaps="handled" contentContainerStyle={pageStyles.page} refreshControl={<RefreshControl refreshing={busy && !!data} onRefresh={() => { void refresh(); }} />}>
     <PageHeading eyebrow="THE WORKSPACE" title="Everything in its place." detail={member!.role === 'technician' ? 'Your assigned work, from first request to a job well done.' : 'Follow each request from the first conversation to completion.'} />
+    {member!.role !== 'technician' && <View style={{ alignSelf: 'flex-start' }}><Button label="New request" icon="plus" onPress={() => router.dismissTo('/new-request')} /></View>}
     <View style={s.search}><Icon name="search" size={19} color={colors.muted} /><TextInput accessibilityLabel="Search job details" placeholder="Search job details" placeholderTextColor={colors.muted} value={input} onChangeText={setInput} onSubmitEditing={submitSearch} returnKeyType="search" style={s.input} autoCapitalize="none" />
       {!!input && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setInput(''); setSearch(''); setPage(0); }} style={s.searchButton}><Icon name="x" color={colors.muted} size={18} /></Pressable>}
       <Pressable accessibilityRole="button" accessibilityLabel="Search work" onPress={submitSearch} style={s.searchButton}><Icon name="arrow-right" size={18} /></Pressable>
