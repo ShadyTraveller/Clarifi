@@ -1,9 +1,9 @@
 # Quick-entry RPC handoff to Muse
 
 Mobile now sends `p_source_ref` with every `create_clarifi_request` call, following
-Muse’s RPC-v2 contract in mobile-branch commit `eb34d43`. That commit added the
-contract at repository root; please put the authoritative update in
-`mobile/CONTRACT.md`. Codex has not edited either contract or backend files.
+Muse’s RPC-v2 contract, now at `mobile/CONTRACT.md` in commit `3367ffd`.
+Muse’s updates are merged into the review branch. Codex has not authored
+changes to either the contract or backend files.
 
 ## Implemented for review
 
@@ -45,3 +45,9 @@ Use only labelled TEST records and remove generated jobs/photos after verificati
 On Android, test camera/gallery permissions, full restart during an uncertain
 save, attachment retry, workspace switching, and reauthentication. Native build
 success is not device verification. Keep PR #1 draft until user review; do not merge.
+
+## Operational reliability requirements
+
+See `OPERATIONS_HANDOFF.md` for the user’s required note, booking, assignment,
+customer-message and warehouse safeguards. These require new backend contract
+shapes; the current mobile UI does not claim they are implemented.

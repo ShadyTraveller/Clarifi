@@ -31,7 +31,7 @@ function Detail({ id }: { id: string }) {
       <Card style={s.card}><Text accessibilityRole="header" style={pageStyles.section}>The request</Text><Text selectable style={s.request}>{job.request}</Text>{!!job.details && <Text selectable style={s.request}>{job.details}</Text>}</Card>
       <Card style={s.card}><Text accessibilityRole="header" style={pageStyles.section}>Appointment</Text><View style={s.line}><Icon name="calendar" color={colors.muted} /><Text style={s.value}>{job.scheduled_start ? dayLabel(new Date(job.scheduled_start)) : 'Not scheduled'}</Text></View>
         {job.scheduled_start && <View style={s.line}><Icon name="clock" color={colors.muted} /><Text style={s.value}>{timeLabel(job.scheduled_start)}{job.scheduled_end ? ` – ${timeLabel(job.scheduled_end)}` : ''} · Toronto time</Text></View>}
-        <Text style={pageStyles.subtle}>{job.assigned_to || job.technician_id ? 'Assigned to the team' : 'Awaiting assignment'}</Text>
+        <Text style={pageStyles.subtle}>{job.assigned_to || job.technician_id ? 'Assignment recorded. Confirm the technician with dispatch.' : 'Awaiting assignment'}</Text>
       </Card>
       <Card style={s.card}><Text accessibilityRole="header" style={pageStyles.section}>Location</Text><View style={s.line}><Icon name="map-pin" color={colors.muted} /><Text selectable style={s.value}>{job.address || 'Address not provided'}</Text></View></Card>
       <JobPhotos key={`${member!.id}:${job.id}`} jobId={job.id} />
