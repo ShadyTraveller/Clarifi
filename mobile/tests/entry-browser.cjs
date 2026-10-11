@@ -53,7 +53,7 @@ async function run(browser, width, noMatch = false) {
    if(req.method()==='POST') {
     jobWrites++; const payload=req.postDataJSON();
     assert.equal(payload.status,'lead'); assert.equal(payload.client_id,clientId); assert.equal(payload.details,'Unit 4B, Gate 1234\n\nBring two keys.');
-    assert.equal(payload.service,'locksmith');
+    assert.equal(payload.service,width === 1280 ? 'security_film' : 'locksmith');
     assert.deepEqual(Object.keys(payload).sort(),['id','organization_id','client_id','request','details','status','service'].sort());
     job={...payload,scheduled_start:null,scheduled_end:null,assigned_to:null,technician_id:null};
     return reply({message:'Uncertain save response'},503);
@@ -80,7 +80,8 @@ async function run(browser, width, noMatch = false) {
  await page.getByLabel('Password',{exact:true}).fill('fixture-password');
  await page.getByRole('button',{name:'Sign in',exact:true}).click();
  await page.getByRole('button',{name:'New request',exact:true}).click();
- await page.getByLabel('Client name',{exact:true}).fill('Test client');
+ if(noMatch) await page.getByLabel('Client name',{exact:true}).fill('Test client');
+ await page.getByRole('radio',{name:'Owner',exact:true}).click();
  await page.getByLabel('Phone',{exact:true}).fill('4165550100 ext. 123');
  await page.getByText('This number has an extension — ask for a direct line.').waitFor();
  await page.getByLabel('Phone',{exact:true}).fill('4165550100');
@@ -97,8 +98,8 @@ async function run(browser, width, noMatch = false) {
  } else {
   await page.getByRole('button',{name:'Use client Morgan Lee',exact:true}).click();
   await page.getByRole('radio',{name:'Security film',exact:true}).click();
-  assert.equal(await page.getByRole('button',{name:'Save request',exact:true}).isDisabled(),true);
-  await page.getByRole('radio',{name:'Locksmith',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Save request',exact:true}).isDisabled(),false);
+  if(width !== 1280) await page.getByRole('radio',{name:'Locksmith',exact:true}).click();
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button',{name:'Choose photos',exact:true}).click();
   await (await chooser).setFiles({name:'Front Door.PNG',mimeType:'image/png',buffer:png});
@@ -129,6 +130,6 @@ async function run(browser, width, noMatch = false) {
 }
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH,args:['--no-sandbox']});
- try {await run(browser,320);await run(browser,1280);await run(browser,390,true);console.log('Entry checks passed: normalized contact reuse, extension warning, new-client/film gates, layout widths, photo picking, uncertain job/upload/metadata reconciliation, draft resume, and signed photo viewing.');}
+ try {await run(browser,320);await run(browser,1280);await run(browser,390,true);console.log('Entry checks passed: contact-only lookup, normalized reuse, Owner choice, canonical film writes, extension warning, new-client gate, layout widths, photo picking, lost-response retries, draft resume, and signed photo viewing.');}
  finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

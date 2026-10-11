@@ -1,10 +1,10 @@
 import type { ServiceKey } from '@yavamo/core';
 
-export const relationships = { tenant: 'Tenant', landlord: 'Landlord', property_management: 'Property management', institution: 'Institution', commercial: 'Commercial', other: 'Other' } as const;
+export const relationships = { tenant: 'Tenant', landlord: 'Landlord', owner: 'Owner', property_management: 'Property management', institution: 'Institution', commercial: 'Commercial', other: 'Other' } as const;
 export type Relationship = keyof typeof relationships;
 export type EntryDraft = { name: string; email: string; phone: string; address: string; relationship: Relationship; service: ServiceKey; request: string; details: string; unit: string; gate: string };
 export const emptyEntry: EntryDraft = { name: '', email: '', phone: '', address: '', relationship: 'tenant', service: 'locksmith', request: '', details: '', unit: '', gate: '' };
-export type ClientMatch = { id: string; name: string; email: string | null; phone: string | null; address: string | null; relationship: Relationship };
+export type ClientMatch = { id: string; name: string; email: string | null; phone: string | null; address: string | null; relationship: Exclude<Relationship, 'owner'> };
 export type EntryPhoto = { id: string; uri: string; name: string; mime: string; size: number; saved: boolean };
 export const maxPhotoBytes = 4 * 1024 * 1024;
 export function normalizeEmail(email: string | null) { return email?.trim().toLowerCase() || null; }
@@ -22,7 +22,7 @@ export function validateEntry(draft: EntryDraft) {
   return errors;
 }
 export function clientPayload(draft: EntryDraft, organizationId: string) {
-  return { organization_id: organizationId, name: draft.name.trim(), email: normalizeEmail(draft.email), phone: draft.phone.trim() || null, address: draft.address.trim() || null, relationship: draft.relationship };
+  return { organization_id: organizationId, name: draft.name.trim(), email: normalizeEmail(draft.email), phone: draft.phone.trim() || null, address: draft.address.trim() || null, relationship: draft.relationship === 'owner' ? 'other' : draft.relationship };
 }
 export function leadPayload(draft: EntryDraft, organizationId: string, clientId: string) {
   const access = [draft.unit.trim() && `Unit ${draft.unit.trim()}`, draft.gate.trim() && `Gate ${draft.gate.trim()}`].filter(Boolean).join(', ');

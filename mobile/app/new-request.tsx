@@ -47,7 +47,9 @@ function EntryForm() {
   }
   async function checkClient() {
     if (pending.current) return;
-    const invalid = validateEntry({ ...draft, request: draft.request || 'Lookup' }); setErrors(invalid);
+    const invalid = validateEntry({ ...draft, name: draft.name || 'Lookup', request: draft.request || 'Lookup' });
+    if (!draft.email.trim() && !draft.phone.trim()) invalid.phone = 'Enter a phone number or email to find the client.';
+    setErrors(invalid);
     if (Object.keys(invalid).length) return;
     pending.current = true; setBusy(true); setMessage(''); setChecked(false);
     lookup.current?.abort(); const abort = new AbortController(); lookup.current = abort;
@@ -133,7 +135,6 @@ function EntryForm() {
         <View style={[s.column, wide && { flex: 1 }]}><Card style={s.card}>
           <Section number="02" title="What needs doing?" icon="briefcase" />
           <Text style={s.label}>Service</Text><View accessibilityRole="radiogroup" accessibilityLabel="Requested service" style={s.choices}>{Object.entries(services).map(([value, label]) => <Choice key={value} label={label} selected={draft.service === value} disabled={locked} onPress={() => updateRequest('service', value)} />)}</View>
-          {draft.service === 'security_film' && <Text style={s.warning}>Security film request entry is awaiting setup. Contact dispatch.</Text>}
           <Field label="Request title" value={draft.request} onChangeText={value => updateRequest('request', value)} error={errors.request} editable={!locked} required placeholder="e.g. Rekey the front door lock" />
           <Field label="Job details" value={draft.details} onChangeText={value => updateRequest('details', value)} editable={!locked} multiline numberOfLines={4} placeholder="What happened? What should the team know?" />
           <View style={s.accessFields}><View style={{ flex: 1 }}><Field label="Unit" value={draft.unit} onChangeText={value => updateRequest('unit', value)} editable={!locked} /></View><View style={{ flex: 1 }}><Field label="Gate code" value={draft.gate} onChangeText={value => updateRequest('gate', value)} editable={!locked} /></View></View>
@@ -147,7 +148,7 @@ function EntryForm() {
       {!!message && <Card style={jobId ? s.success : s.notice}><Text accessibilityRole="alert" style={s.hint}>{message}</Text></Card>}
       {attemptId && !jobId && <Text style={s.hint}>This save is still unconfirmed. Retry checks the same request. Your entry is kept when you switch screens.</Text>}
       <View style={s.footer}><Text style={[s.hint, { flex: 1 }]}>Requests start in the queue. Scheduling and assignment come later.</Text>
-        {!jobId || remaining ? <Button label={jobId ? 'Retry photos' : attemptId ? 'Retry save' : 'Save request'} icon="arrow-right" busy={busy} disabled={picking || !client || draft.service === 'security_film'} onPress={() => { void submit(); }} /> : <Button label="Create another request" icon="plus" onPress={() => { reset(); setChecked(false); setMatches([]); setMessage(''); setErrors({}); }} />}
+        {!jobId || remaining ? <Button label={jobId ? 'Retry photos' : attemptId ? 'Retry save' : 'Save request'} icon="arrow-right" busy={busy} disabled={picking || !client} onPress={() => { void submit(); }} /> : <Button label="Create another request" icon="plus" onPress={() => { reset(); setChecked(false); setMatches([]); setMessage(''); setErrors({}); }} />}
       </View>
     </ScrollView>
   </KeyboardAvoidingView>;

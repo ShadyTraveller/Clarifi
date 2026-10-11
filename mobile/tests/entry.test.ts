@@ -18,6 +18,8 @@ test('lead payload prepends access instructions, starts as lead, and omits assig
   const draft = { ...emptyEntry, name: ' Client ', request: ' Rekey lock ', email: 'CLIENT@EXAMPLE.TEST ', unit: ' 4B ', gate: ' 1234 ', details: ' Bring two keys. ' };
   assert.deepEqual(leadPayload(draft, 'org', 'client'), { organization_id: 'org', client_id: 'client', request: 'Rekey lock', details: 'Unit 4B, Gate 1234\n\nBring two keys.', status: 'lead', service: 'locksmith' });
   assert.equal(clientPayload(draft, 'org').email, 'client@example.test');
+  assert.equal(clientPayload({ ...draft, relationship: 'owner' }, 'org').relationship, 'other');
+  assert.equal(leadPayload({ ...draft, service: 'security_film' }, 'org', 'client').service, 'security_film');
   assert.equal(leadPayload({ ...emptyEntry, request: 'Job' }, 'org', 'client').details, null);
 });
 test('photo boundaries reject oversized/non-image/empty uploads and sanitize traversal characters', () => {

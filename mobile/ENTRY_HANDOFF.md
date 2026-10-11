@@ -1,8 +1,8 @@
 # Quick-entry handoff to Muse
 
-Read §9 from mobile-branch commit `cb391a3933564e753ac5a5ef7e060e3db73de3bc`.
-That commit updates root `CONTRACT.md`; `mobile/CONTRACT.md` still ends at §8.
-Please consolidate the authoritative handoff at the agreed mobile path.
+Integrated Muse's contract updates through mobile-branch commit
+`6ea249c` without editing the contract. §9 is now at `mobile/CONTRACT.md`.
+The film key (`security_film`) and Owner → `other` mapping are resolved.
 
 ## Implemented for review
 
@@ -16,25 +16,22 @@ Please consolidate the authoritative handoff at the agreed mobile path.
 - Private `job-files` uploads, sanitized names, 4 MB image limit, `job_files`
   metadata, and one-hour signed URLs generated only for viewing.
 - Drafts persist in memory across navigation and clear on workspace/sign-out.
-  New-client inserts and security-film writes are currently disabled.
+  All four services can save existing-client leads. New-client inserts remain disabled.
 
 ## Backend answers needed to finish new-client entry
 
-1. **Atomic normalized dedupe:** §9 says never duplicate. Read-before-insert does
-   not enforce this with simultaneous submissions or uncertain responses. Live
-   metadata shows only the client primary-key unique index and no client/intake
-   RPC. Please supply an org-scoped atomic create-or-reuse operation, its exact
-   input/return shape, and concurrency semantics. Handle email OR phone conflicts,
-   null contacts, and formatted stored phones. The UI will consume that operation
-   rather than inventing a mobile-only backend rule. No raw client INSERT fallback
-   is shipped.
-2. **Owner relationship:** §6 lists Owner, §9 omits it. Confirm whether it maps to
-   `other`, `landlord`, or a new enum value before exposing the choice.
-3. **Institution relationship:** the live enum currently lacks `institution`.
-   Apply the backend migration before new-client institution writes are enabled.
-4. **Film service:** §9 says `security-film`; shared core and current read filters
-   use `security_film`. Confirm the canonical stored key and align the contract/core
-   so film requests also appear in mobile lists. Other service entry remains usable.
+1. **RPC integration requirements:** `create_clarifi_request` exists live and is
+   documented in §9. Its implementation still needs Muse's review for active
+   office-membership authorization, concurrency-safe normalized client dedupe,
+   blank-fields-only updates, and request idempotency. Please document a caller-
+   supplied stable request UUID and replay behavior, returning the same job on
+   retry. Handle email OR phone conflicts, null contacts, and formatted stored
+   phones. Current mobile direct lead writes already reconcile by stable UUID;
+   new-client RPC integration must preserve that behavior. No raw client INSERT
+   fallback is shipped. Detailed observations were supplied to Lavie for Muse.
+2. **Institution relationship:** the live enum currently lacks `institution`.
+   Apply the backend migration or define an explicit fallback in the corrected
+   RPC and contract before new-client institution writes are enabled.
 
 ## Android review steps
 
@@ -50,13 +47,21 @@ Please consolidate the authoritative handoff at the agreed mobile path.
    Technician accounts must not expose entry; direct API writes remain subject
    to backend RLS. Verify RLS independently with signed-in test accounts.
 
-Synthetic browser checks verify behavior, not live Storage policies or native
-camera behavior. Android export is a build check, not a device test. No backend
-files or contract files were edited by Codex for this feature.
+Synthetic browser checks verify behavior, not native camera behavior. Android
+export is a build check, not a device test. No backend files or contract files
+were edited by Codex for this feature; Muse's contract commits were integrated.
 
 Validation: TypeScript and unit checks, web and Android exports, existing
 navigation browser regression checks, and synthetic quick-entry checks passed.
 Read-only live preflight passed for both approved roles: sign-in, active membership,
-organization-scoped client reads, and file metadata reads. No live business
-records were written by these checks. Live request/upload writes and Android
-camera behavior remain unverified.
+organization-scoped client reads, and file metadata reads. Live API checks also
+passed for existing-client film lead saves/retries, unassigned/unscheduled state,
+photo upload/retry, metadata, signed download, scoped detail, and unchanged contact.
+Generated TEST jobs/photos were removed and the temporary fixture email restored.
+Only test records were used. New-client RPC behavior, Android camera behavior,
+and the broader backend authorization review remain pending.
+
+The complete live browser flow also passed: dispatcher sign-in, contact-only
+lookup, film lead save, photo selection/upload/display, persisted job data,
+contact preservation, sign-out draft reset, and technician entry visibility.
+The browser test's job/photo were removed and fixture contact restored.

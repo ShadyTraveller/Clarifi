@@ -37,7 +37,6 @@ export async function verifyEntryAccess(db: SupabaseClient, member: Membership, 
 export async function createLead(db: SupabaseClient, member: Membership, draft: EntryDraft, client: ClientMatch | null, jobId: string, signal: AbortSignal) {
   // No client INSERT fallback: only Muse can provide atomic normalized dedupe.
   if (!client) throw new Error('New clients are temporarily unavailable. Choose an existing client or contact dispatch.');
-  if (draft.service === 'security_film') throw new Error('Security film request entry is awaiting setup. Contact dispatch.');
   await verifyEntryAccess(db, member, signal);
   const contact = await db.from('clients').select('id').eq('organization_id', member.organization_id).eq('id', client.id).abortSignal(signal).maybeSingle();
   if (contact.error || !contact.data) throw new Error('This client is no longer available. Check the client again.');

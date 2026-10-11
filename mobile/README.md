@@ -50,7 +50,7 @@ changing configuration. Never distribute a synthetic build as a live app.
 - Only explicit job/client display columns are fetched. Quote lines, supplier
   catalogs, internal notes, and supplier prices are not requested.
 - Supported services follow the actual `@yavamo/core` `ServiceKey` type. Its current
-  film key is `security_film` (the contract's illustrative snippet uses a hyphen).
+  film key is `security_film`, confirmed by the updated mobile contract.
 - Refresh on focus, pull-to-refresh, and every minute while foregrounded. Failed
   refreshes visibly label stale data; no fabricated live GPS or live queue status.
 - Quick-entry creates lead jobs for existing clients and attaches photos. It
@@ -105,8 +105,8 @@ and an active membership; a public key alone does not grant workspace access.
 
 ## Backend review for Muse
 
-The contract belongs to Muse; it has not been changed. Please record week/month
-calendar scope, the canonical `security_film` key, and the assignment linkage above.
+The contract belongs to Muse; its latest commits have been integrated without
+editing it. Please record week/month calendar scope and the assignment linkage above.
 The live project contains `active`, `display_name`, and `technicians.auth_user_id`,
 but parts of that schema/policy setup are not reproducible from the checked-in
 migrations alone. Any future fresh project must be checked for these dependencies.
@@ -180,3 +180,28 @@ Run `tests/entry-browser.cjs` against the synthetic export described above. It
 checks formatted-phone/case-insensitive-email matching, extension warnings,
 restricted write shapes, lost job/upload/metadata responses, draft resumption,
 signed photo viewing, and responsive widths. It never writes live data.
+
+Owner maps to `other` as Muse confirmed. All four service choices can save leads
+for existing clients, including `security_film`. New-client creation remains
+disabled while Muse corrects the documented RPC's authorization, concurrency,
+contact preservation, and retry behavior. Institution also needs live enum support.
+
+`tests/entry-live.mjs` verifies signed-in lead/photo writes, safe retries, signed
+downloads, scoped job details, and unchanged contact data using an existing
+labelled TEST client. Supply `YAVAMO_TEST_ORG_A`, `YAVAMO_TEST_CLIENT_ID`, public
+project configuration, and dispatcher credentials through runtime settings.
+The script uses Node 24 with `--experimental-strip-types`. It temporarily assigns
+an email only if the TEST fixture has no contact, restores that field, and removes
+only the generated job/photo. Never run it against a customer client.
+
+Live API verification passed for existing-client film leads and photos; this
+does not certify new-client RPC behavior, native camera permissions, or the full
+backend authorization model.
+
+`tests/entry-live-browser.cjs` checks the same flow through a live-configured web
+export: sign-in → contact lookup → film request/photo → saved job detail. It
+verifies the image actually displays, confirms persisted data, checks draft reset
+after sign-out, and verifies technicians have no entry action. Supply the same
+runtime settings plus `PLAYWRIGHT_MODULE`, `CHROME_PATH`, and `TEST_BASE_URL`.
+It uses the same TEST-only fixture and cleanup rules. The complete live browser
+flow passed; it performs no new-client RPC calls.
