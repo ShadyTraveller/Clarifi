@@ -173,18 +173,32 @@ const { data: existing } = await supabase
 If found: use the existing client ID for the job. Optionally fill blank
 fields (don't overwrite existing data).
 
-**Atomic option (recommended):** call the `create_clarifi_request` RPC instead
-of manual read-then-insert. It does find-or-create atomically server-side:
+**Use the RPC (required):** call `create_clarifi_request` — it enforces all
+four backend guarantees (migration `202610100005`):
 ```typescript
+const requestKey = crypto.randomUUID(); // stable per form submission
 const { data: jobId, error } = await supabase.rpc('create_clarifi_request', {
   target_org: orgId,
   client_info: { name, role, email, phone, address },
   job_info: { title, details, service, markdown: null, technician_id: null, latitude: null, longitude: null },
+  p_source_ref: requestKey,
 });
-// Returns the new job's UUID. Client dedupe handled inside.
+// Returns the job UUID. Reuse the SAME requestKey on retry — the RPC returns
+// the existing job instead of creating a duplicate.
 ```
-Requires migration `202610100003` applied. Falls back to manual dedupe if
-the RPC is unavailable.
+
+**The four guarantees (enforced server-side):**
+1. **Authorization** — caller must hold an active office membership
+   (owner/admin/office/dispatcher) in the org. Technicians get a 42501
+   error. Inactive members are rejected.
+2. **Concurrency-safe dedupe** — simultaneous submissions for the same
+   client (email/phone) serialize via advisory lock; one client row wins.
+3. **Blank-fields-only updates** — existing client data is never
+   overwritten; only empty fields are filled from new submissions.
+4. **Stable request ID** — `p_source_ref` is the idempotency key. Retry with
+   the same key (timeout, double-tap, app restart) and the RPC returns the
+   original job ID. Generate one UUID per form submission and persist it
+   with the draft until the save succeeds.
 
 ### Client insert shape
 ```typescript
