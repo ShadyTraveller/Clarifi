@@ -258,3 +258,106 @@ null; backend geocodes on web/agent intake — mobile v1 skips geocoding).
 - `organization_members` — admin-only writes (RLS denies non-admins).
 - `invoices` — read-only on mobile (office sends).
 - `quotes` with `source='agent'` — read-only; office reviews.
+
+## 10. Notes, scheduling, receipts, customer updates (Muse-confirmed 2026-10-11)
+
+Backend: migration `202610110001`. All tables org-scoped via RLS.
+
+### 10a. Shared office/technician notes
+```typescript
+// job_notes
+{
+  id: string,
+  organization_id: string,
+  job_id: string,
+  author_user_id: string | null,
+  body: string,
+  visibility: 'internal' | 'office',  // 'internal': office+tech; 'office': office only
+  created_at: string,
+}
+// job_note_reads (unread acknowledgement)
+{
+  note_id: string,
+  user_id: string,
+  read_at: string,
+}
+```
+- Insert a note: `supabase.from('job_notes').insert({ organization_id, job_id, body, visibility })` — `author_user_id` defaults from session; set explicitly if needed.
+- Mark read: `supabase.from('job_note_reads').insert({ note_id, user_id })` — RLS enforces `user_id = auth.uid()`.
+- Unread for user X: notes with no `job_note_reads` row for (note_id, X).
+- **Visibility rule (enforce in UI queries):** technicians must filter `visibility = 'internal'`; office sees all. The RLS policy allows members to read, so the UI must apply the visibility filter — never show `visibility='office'` notes to technicians.
+- Authors can delete their own notes.
+
+### 10b. Atomic scheduling and assignment
+Use the `assign_job` RPC — never write `technician_id`/`scheduled_*` directly:
+```typescript
+const { data: jobId, error } = await supabase.rpc('assign_job', {
+  p_job_id: jobId,
+  p_technician_id: techId,       // uuid | null (null = unassign)
+  p_start: isoStart,             // timestamptz
+  p_end: isoEnd,                 // timestamptz
+  p_expected_updated_at: jobUpdatedAt,  // from your last job read
+});
+```
+Server guarantees:
+- **Office-only.** Technicians calling this get error 42501.
+- **Stale-update rejection.** If the job changed since `p_expected_updated_at`, error P0003 — refresh the job and retry. Always pass the `updated_at` from your latest read.
+- **Overlap check.** If the technician has another non-completed job overlapping `[p_start, p_end)`, error P0004 with the conflicting job ID.
+- **Atomic.** The check-and-write happens in one transaction.
+
+### 10c. Job-linked warehouse receipts
+```typescript
+// warehouse_receipts
+{
+  id: string,
+  organization_id: string,
+  job_id: string,                  // the job these parts are for
+  part_tracking_id: string | null,  // link to part_tracking row, if tracked
+  received_by_user_id: string | null,
+  received_at: string,              // defaults now()
+  condition: 'good' | 'damaged' | 'partial',
+  notes: string | null,
+  photo_path: string | null,       // optional: path in job-files bucket
+}
+```
+- **Partial arrivals:** insert one receipt per delivery with `condition='partial'` and notes describing what arrived vs. what's missing. Do not mark the whole order received until all parts arrive.
+- Link `part_tracking_id` when the shipment was tracked; leave null for hand-delivered or untracked parts.
+
+### 10d. Customer-update delivery status
+```typescript
+// customer_updates
+{
+  id: string,
+  organization_id: string,
+  job_id: string,
+  client_id: string,
+  kind: string,  // 'estimate_ready' | 'scheduled' | 'on_the_way' | 'completed' | 'invoice_sent' | 'review_request'
+  channel: 'email' | 'sms',
+  recipient: string,   // email or phone actually used
+  subject: string | null,
+  body: string,        // rendered content
+  status: 'draft' | 'queued' | 'sent' | 'delivered' | 'confirmed' | 'failed' | 'bounced',
+  provider: string | null,             // 'resend' | 'twilio'
+  provider_message_id: string | null,  // for webhook correlation
+  sent_at / delivered_at / confirmed_at / failed_at: string | null,
+  failure_reason: string | null,
+  retry_count: number,
+  next_retry_at: string | null,
+  escalated: boolean,
+  escalated_at: string | null,
+}
+```
+**Status meanings (distinct — never conflate):**
+- `draft` — composed, office has not approved. Nothing left the building.
+- `queued` — approved, waiting for the provider.
+- `sent` — provider accepted the message. **This is NOT delivery proof.**
+- `delivered` — provider confirmed it reached the recipient's inbox/phone.
+- `confirmed` — customer acknowledged (clicked link, replied).
+- `failed` — provider reported failure. Retryable: increment `retry_count`, set `next_retry_at`.
+- `bounced` — hard bounce / invalid recipient. Not retryable.
+
+**Retry/escalation contract:**
+- On `failed`: retry up to 3 times with backoff (`next_retry_at`). After 3 failures, set `escalated=true`, `escalated_at=now()` — the office must intervene manually.
+- On `bounced`: do not retry. Flag for office to verify the contact details.
+
+**Hard rule:** the office `notifications` table is internal-only. An office notification (even `emailed=true`) **must never** be displayed as customer contact. Only `customer_updates` rows track what the customer actually received. When showing "customer notified" in the UI, query `customer_updates` — never `notifications`.
