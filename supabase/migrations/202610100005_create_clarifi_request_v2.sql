@@ -1,20 +1,21 @@
 -- create_clarifi_request v2: hardened intake RPC.
 --
--- Guarantees (per Codex backend handoff 2026-10-10):
+-- Guarantees:
 -- 1. AUTHORIZATION: authenticated callers must hold an ACTIVE office
 --    membership (owner/admin/office/dispatcher) in target_org. Technicians
 --    and inactive members are rejected. service_role (webhooks, agents)
 --    bypasses the check (auth.uid() is null for service_role).
--- 2. CONCURRENCY-SAFE DEDUPE: an advisory transaction lock on the normalized
---    client identity (org + email + phone digits) serializes simultaneous
---    submissions, so two concurrent requests for the same client create one
---    client row, not two.
+--    ANON IS REVOKED — anonymous callers cannot create intake.
+-- 2. CONCURRENCY-SAFE DEDUPE: separate advisory transaction locks on
+--    normalized email and phone digits serialize simultaneous submissions
+--    sharing either identity field, so two concurrent requests for the
+--    same client create one client row, not two.
 -- 3. BLANK-FIELDS-ONLY UPDATES: when reusing an existing client, only NULL/
 --    empty fields are filled. Existing data is never overwritten.
 -- 4. STABLE REQUEST ID: pass p_source_ref (client-generated UUID) for
---    idempotency. If a job with that source_ref already exists in the org,
---    the existing job ID is returned instead of creating a duplicate.
---    This reconciles retries, timeouts, and double-taps.
+--    idempotency. A UNIQUE constraint on (organization_id, source_ref)
+--    guarantees concurrent retries return the existing job instead of
+--    creating duplicates.
 --
 -- Args:
 --   target_org   - organization uuid
@@ -23,6 +24,22 @@
 --                         latitude, longitude}
 --   p_source_ref - text (optional) idempotency key, e.g. mobile-generated UUID
 -- Returns: the job's uuid (new or existing on retry).
+
+-- 4a. Enforce source_ref uniqueness for true idempotency under concurrency.
+-- Dedupe any existing duplicates first (keep earliest job per source_ref).
+delete from public.jobs j1
+using public.jobs j2
+where j1.organization_id = j2.organization_id
+  and j1.source_ref = j2.source_ref
+  and j1.source_ref is not null
+  and j1.created_at > j2.created_at
+  and j1.id <> j2.id;
+
+drop index if exists public.jobs_org_source_ref_idx;
+
+create unique index if not exists jobs_org_source_ref_uidx
+  on public.jobs (organization_id, source_ref)
+  where source_ref is not null;
 
 create or replace function public.create_clarifi_request(
   target_org uuid,
@@ -43,9 +60,11 @@ declare
   v_phone_digits text;
   v_role text;
   v_caller_uid uuid;
-  v_lock_key bigint;
+  v_source_ref text;
 begin
   -- 1. Authorization: active office membership required for human callers.
+  -- auth.uid() is null for service_role (backend) — bypasses the check.
+  -- anon is revoked at the grant level and cannot reach this code.
   v_caller_uid := auth.uid();
   if v_caller_uid is not null then
     if not exists (
@@ -60,14 +79,16 @@ begin
         using errcode = '42501';
     end if;
   end if;
-  -- service_role (v_caller_uid is null): webhooks and agents bypass the check.
 
-  -- 4. Idempotency: return existing job if this source_ref was already used.
-  if p_source_ref is not null and btrim(p_source_ref) <> '' then
+  -- Normalize idempotency key.
+  v_source_ref := nullif(btrim(coalesce(p_source_ref, '')), '');
+
+  -- 4b. Idempotency: return existing job if this source_ref was already used.
+  if v_source_ref is not null then
     select j.id into v_job_id
     from public.jobs j
     where j.organization_id = target_org
-      and j.source_ref = p_source_ref
+      and j.source_ref = v_source_ref
     limit 1;
     if v_job_id is not null then
       return v_job_id;
@@ -79,15 +100,15 @@ begin
   v_phone := nullif(btrim(coalesce(client_info->>'phone', '')), '');
   v_phone_digits := nullif(regexp_replace(coalesce(v_phone, ''), '\D', '', 'g'), '');
 
-  -- 2. Concurrency-safe dedupe: lock on normalized identity for this txn.
-  -- Two simultaneous submissions for the same client serialize here;
-  -- the second sees the row the first inserted.
-  v_lock_key := hashtext(
-    coalesce(target_org::text, '') || '|' ||
-    coalesce(v_email, '') || '|' ||
-    coalesce(v_phone_digits, '')
-  );
-  perform pg_advisory_xact_lock(v_lock_key);
+  -- 2. Concurrency-safe dedupe: lock on EACH identity field separately.
+  -- Two submissions sharing email OR phone serialize here; the second
+  -- sees the client row the first inserted.
+  if v_email is not null then
+    perform pg_advisory_xact_lock(hashtext('email|' || target_org::text || '|' || v_email));
+  end if;
+  if v_phone_digits is not null then
+    perform pg_advisory_xact_lock(hashtext('phone|' || target_org::text || '|' || v_phone_digits));
+  end if;
 
   -- Find existing client by email or phone digits (most recent first).
   select c.id into v_client_id
@@ -105,7 +126,6 @@ begin
 
   -- Safe role: downgrade anything the enum doesn't know to 'other'.
   -- UI 'owner' -> 'other' (no owner enum value).
-  -- 'institution' requires migration 202610050001; downgraded until applied.
   v_role := coalesce(client_info->>'role', 'other');
   if v_role not in (
     'tenant', 'landlord', 'property_management',
@@ -115,7 +135,7 @@ begin
   end if;
 
   if v_client_id is null then
-    -- New client. (Lock above prevents concurrent duplicates.)
+    -- New client. (Locks above prevent concurrent duplicates.)
     insert into public.clients (
       organization_id, name, email, phone, address, relationship
     )
@@ -124,7 +144,7 @@ begin
       nullif(btrim(coalesce(client_info->>'name', '')), ''),
       v_email,
       v_phone,
-      nullif(btrim(coalesce(client_info->>'address', ''))), ''),
+      nullif(btrim(coalesce(client_info->>'address', '')), ''),
       v_role::public.client_relationship
     )
     returning id into v_client_id;
@@ -147,14 +167,15 @@ begin
       end,
       address = case
         when btrim(coalesce(address, '')) = ''
-          then nullif(btrim(coalesce(client_info->>'address', ''))), '')
+          then nullif(btrim(coalesce(client_info->>'address', '')), '')
         else address
       end,
       updated_at = now()
     where id = v_client_id;
   end if;
 
-  -- Always create a new job (unless idempotency returned above).
+  -- Create the job. ON CONFLICT handles the race where two concurrent
+  -- transactions both passed the idempotency check above.
   insert into public.jobs (
     organization_id, client_id, request, details, status, service,
     technician_id, latitude, longitude, source_ref
@@ -162,26 +183,42 @@ begin
   values (
     target_org,
     v_client_id,
-    coalesce(nullif(btrim(coalesce(job_info->>'title', ''))), ''), 'New request'),
+    coalesce(nullif(btrim(coalesce(job_info->>'title', '')), ''), 'New request'),
     job_info->>'details',
     'lead',
     nullif(job_info->>'service', ''),
     nullif(job_info->>'technician_id', '')::uuid,
     nullif(job_info->>'latitude', '')::numeric,
     nullif(job_info->>'longitude', '')::numeric,
-    nullif(btrim(coalesce(p_source_ref, '')), '')
+    v_source_ref
   )
+  on conflict (organization_id, source_ref) where source_ref is not null
+  do nothing
   returning id into v_job_id;
+
+  -- If the insert was suppressed by the conflict, fetch the existing job.
+  if v_job_id is null and v_source_ref is not null then
+    select j.id into v_job_id
+    from public.jobs j
+    where j.organization_id = target_org
+      and j.source_ref = v_source_ref
+    limit 1;
+  end if;
 
   return v_job_id;
 end;
 $$;
 
+-- SECURITY: anon revoked. Only authenticated office members (checked inside
+-- the function) and service_role (backend/webhooks) may execute.
+revoke execute on function public.create_clarifi_request(uuid, jsonb, jsonb, text) from anon;
+revoke execute on function public.create_clarifi_request(uuid, jsonb, jsonb) from anon;
+
 grant execute on function public.create_clarifi_request(uuid, jsonb, jsonb, text)
-  to authenticated, service_role, anon;
+  to authenticated, service_role;
 
 comment on function public.create_clarifi_request(uuid, jsonb, jsonb, text) is
-  'Hardened intake: office-auth, concurrency-safe dedupe, blank-only updates, idempotent via source_ref.';
+  'Hardened intake: office-auth (anon revoked), concurrency-safe dedupe, blank-only updates, idempotent via source_ref.';
 
 -- Keep the 3-arg signature working (delegates to the 4-arg version).
 create or replace function public.create_clarifi_request(
@@ -198,4 +235,4 @@ as $$
 $$;
 
 grant execute on function public.create_clarifi_request(uuid, jsonb, jsonb)
-  to authenticated, service_role, anon;
+  to authenticated, service_role;
