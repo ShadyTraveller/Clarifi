@@ -1,9 +1,12 @@
--- Backend for Codex mobile contract §10: notes, scheduling, receipts, customer updates.
+-- Backend for mobile contract §10: notes, scheduling, receipts, customer updates.
+-- FIXED 2026-10-15: enum crash, atomicity, RLS, technician verification.
 --
 -- 1. job_notes: shared office/technician notes with author, visibility, and
---    unread acknowledgement (via job_note_reads).
+--    unread acknowledgement (via job_note_reads). Office-only visibility is
+--    enforced in RLS, not just app-side.
 -- 2. assign_job RPC: atomic scheduling + assignment with overlap checks and
---    stale-update rejection.
+--    stale-update rejection. Advisory lock serializes concurrent assignments
+--    for the same technician.
 -- 3. warehouse_receipts: job-linked proof-of-delivery for tracked parts.
 -- 4. customer_updates: customer-facing update lifecycle with distinct
 --    sent / delivered / confirmed states, retry, and escalation.
@@ -34,17 +37,30 @@ create table if not exists public.job_note_reads (
 alter table public.job_notes enable row level security;
 alter table public.job_note_reads enable row level security;
 
--- Notes: members can read notes for their org; visibility enforced app-side
--- for 'office'-only (technicians filtered by role in queries).
+-- Notes: office-only visibility enforced in RLS (not just app-side).
+-- Technicians see 'internal' notes; office staff see all.
 drop policy if exists "members can read job notes" on public.job_notes;
 create policy "members can read job notes"
   on public.job_notes for select to authenticated
-  using (private.is_org_member(organization_id));
+  using (
+    private.is_org_member(organization_id)
+    and (
+      visibility = 'internal'
+      or private.is_office_member(organization_id)
+    )
+  );
 
 drop policy if exists "members can write job notes" on public.job_notes;
 create policy "members can write job notes"
   on public.job_notes for insert to authenticated
-  with check (private.is_org_member(organization_id));
+  with check (
+    private.is_org_member(organization_id)
+    and (
+      -- Technicians can only create 'internal' notes, not 'office'-only.
+      visibility = 'internal'
+      or private.is_office_member(organization_id)
+    )
+  );
 
 drop policy if exists "authors can delete job notes" on public.job_notes;
 create policy "authors can delete job notes"
@@ -59,6 +75,10 @@ create policy "members can read note reads"
       select 1 from public.job_notes n
       where n.id = job_note_reads.note_id
         and private.is_org_member(n.organization_id)
+        and (
+          n.visibility = 'internal'
+          or private.is_office_member(n.organization_id)
+        )
     )
   );
 
@@ -80,7 +100,9 @@ create policy "members can write note reads"
 -- Assigns a technician and time window atomically:
 -- - Rejects if the job changed since the caller read it (stale update).
 -- - Rejects if the technician has an overlapping assignment.
+-- - Verifies technician belongs to the same org and is active.
 -- - Only office staff (not technicians) can assign.
+-- - Advisory lock on technician serializes concurrent assignments.
 create or replace function public.assign_job(
   p_job_id uuid,
   p_technician_id uuid,
@@ -126,13 +148,31 @@ begin
     raise exception 'Invalid time window' using errcode = '22000';
   end if;
 
-  -- Overlap check: no other active job for this tech in [p_start, p_end).
+  -- Verify technician belongs to this org and is active.
   if p_technician_id is not null then
+    if not exists (
+      select 1 from public.technicians t
+      where t.id = p_technician_id
+        and t.organization_id = v_org
+        and t.active = true
+    ) then
+      raise exception 'Technician not found or inactive in this organization'
+        using errcode = 'P0002';
+    end if;
+
+    -- Serialize concurrent assignments for this technician.
+    -- Without this, two transactions could both pass the overlap check
+    -- below and create conflicting assignments.
+    perform pg_advisory_xact_lock(hashtext('tech-assign|' || p_technician_id::text));
+
+    -- Overlap check: no other non-completed job for this tech in [p_start, p_end).
+    -- Note: project_status enum is ('lead','active','estimate','completed') —
+    -- there is no 'cancelled' value.
     select j.id into v_conflict
     from public.jobs j
     where j.technician_id = p_technician_id
       and j.id != p_job_id
-      and j.status not in ('completed', 'cancelled')
+      and j.status != 'completed'
       and j.scheduled_start is not null
       and j.scheduled_end is not null
       and j.scheduled_start < p_end
@@ -159,7 +199,7 @@ grant execute on function public.assign_job(uuid, uuid, timestamptz, timestamptz
   to authenticated;
 
 comment on function public.assign_job(uuid, uuid, timestamptz, timestamptz, timestamptz) is
-  'Atomic assign: office-only, rejects stale updates and overlapping assignments.';
+  'Atomic assign: office-only, verifies tech org/active, rejects stale updates and overlapping assignments (advisory lock serialized).';
 
 -- ============================================================
 -- 3. Warehouse receipts (job-linked proof of delivery)
@@ -174,7 +214,7 @@ create table if not exists public.warehouse_receipts (
   condition text not null default 'good'
     check (condition in ('good', 'damaged', 'partial')),
   notes text,
-  photo_path text,  -- optional: path in job-files bucket
+  photo_path text,
   created_at timestamptz not null default now()
 );
 
@@ -193,36 +233,23 @@ create policy "members can write receipts"
 -- ============================================================
 -- 4. Customer updates (delivery lifecycle)
 -- ============================================================
--- Tracks customer-facing communications with DISTINCT states:
---   draft → queued → sent → delivered → confirmed
---                        ↘ failed / bounced (→ retry → escalated)
--- An office `notifications` row is internal and MUST NOT count as
--- notifying the customer. Only this table tracks customer delivery.
 create table if not exists public.customer_updates (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   job_id uuid not null references public.jobs(id) on delete cascade,
   client_id uuid not null references public.clients(id) on delete cascade,
   kind text not null,
-    -- e.g. 'estimate_ready' | 'scheduled' | 'on_the_way' |
-    --      'completed' | 'invoice_sent' | 'review_request'
   channel text not null check (channel in ('email', 'sms')),
-  recipient text not null,  -- email address or phone number used
-  subject text,             -- email subject (null for sms)
-  body text not null,       -- rendered content that was (or will be) sent
-  -- Lifecycle. Transitions are forward-only except failed → queued (retry).
+  recipient text not null,
+  subject text,
+  body text not null,
   status text not null default 'draft'
     check (status in (
-      'draft',      -- composed, office has not approved/sent
-      'queued',     -- approved, waiting for provider
-      'sent',       -- provider accepted (NOT proof of delivery)
-      'delivered',  -- provider confirmed delivery to recipient
-      'confirmed',  -- customer acknowledged (link click, reply, etc.)
-      'failed',     -- provider reported failure (retryable)
-      'bounced'     -- hard bounce / invalid recipient (not retryable)
+      'draft', 'queued', 'sent', 'delivered', 'confirmed',
+      'failed', 'bounced'
     )),
-  provider text,              -- 'resend' | 'twilio' | etc.
-  provider_message_id text,   -- for webhook correlation
+  provider text,
+  provider_message_id text,
   sent_at timestamptz,
   delivered_at timestamptz,
   confirmed_at timestamptz,
@@ -239,7 +266,6 @@ create table if not exists public.customer_updates (
 
 alter table public.customer_updates enable row level security;
 
--- Office staff manage; technicians can read (to see what the customer was told).
 drop policy if exists "office can manage customer updates" on public.customer_updates;
 create policy "office can manage customer updates"
   on public.customer_updates for all to authenticated
