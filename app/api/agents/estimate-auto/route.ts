@@ -36,7 +36,7 @@ export const runtime = 'nodejs';
  * the quote is created with status 'draft', source 'agent'.
  */
 
-const SERVICE_KEYS = ['doors', 'security-film', 'locksmith', 'skincare'] as const;
+const SERVICE_KEYS = ['doors', 'security-film', 'locksmith'] as const;
 
 interface TemplateRow {
   id: string;

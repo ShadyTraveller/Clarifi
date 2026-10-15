@@ -23,7 +23,7 @@ export const runtime = 'nodejs';
  * instead of creating a duplicate. Without source_ref, a lead-stage job
  * for the same client + service created in the last 24h is treated as
  * the same request.
- * - service must be one of: doors | security-film | locksmith | skincare.
+ * - service must be one of: doors | security-film | locksmith.
  * - role: tenant | landlord | owner | property_management | institution |
  *   commercial | other (stored in notes; tenant/landlord flips the
  *   assessment flag to collect_before_visit).
@@ -32,7 +32,7 @@ export const runtime = 'nodejs';
  * Never sends anything to clients. Returns { ok, client_id, job_id }.
  */
 
-const SERVICE_KEYS = ['doors', 'security-film', 'locksmith', 'skincare'] as const;
+const SERVICE_KEYS = ['doors', 'security-film', 'locksmith'] as const;
 
 function normalizeService(raw: unknown): string | null {
   const s = String(raw || '').trim().toLowerCase().replace(/_/g, '-');

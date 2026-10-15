@@ -126,28 +126,6 @@ export const SERVICE_TEMPLATES: ServiceTemplate[] = [
       note: 'Complex multi-unit commercial runs 8–15% net',
     },
   },
-  {
-    key: 'skincare',
-    service: 'Skincare',
-    name: 'Skincare / Med Spa — service call',
-    description: 'Skincare treatment service call. Consumables are priced per treatment.',
-    // PLACEHOLDER material list — replace with real supplier list
-    materials: [
-      { id: 'sm-consumables', name: 'Treatment consumables kit', unit: 'each', defaultQty: 1, placeholder: true },
-      { id: 'sm-aftercare', name: 'Aftercare product', unit: 'each', defaultQty: 1, placeholder: true },
-    ],
-    labor: [{ id: 'sl-treatment', name: 'Treatment labour', defaultHours: 1, defaultTier: 'standard' }],
-    measurements: [
-      { key: 'sessions', label: 'Session count', unit: 'count', required: false },
-    ],
-    photoChecklist: PHOTO_CHECKLISTS.Skincare,
-    margin: {
-      laborMarginPct: 70,
-      materialMarkupPct: 25,
-      netWarnBelow: 20,
-      note: 'Consumables priced per treatment',
-    },
-  },
 ];
 
 /** Resolve a template from a job service value (key or label). Falls back to the first template. */

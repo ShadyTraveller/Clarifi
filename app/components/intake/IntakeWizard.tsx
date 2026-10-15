@@ -59,7 +59,6 @@ const SERVICE_KEYS: { key: string; display: string }[] = [
   { key: 'locksmith', display: 'Locksmith' },
   { key: 'security_film', display: 'Security Window Film' },
   { key: 'doors', display: 'Doors' },
-  { key: 'skincare', display: 'Skincare' },
 ];
 
 const ROLE_OPTIONS: { value: Role; display: string; note?: string }[] = [
