@@ -1,9 +1,17 @@
-export const SERVICES = [
+// Services offered for NEW jobs. Windows is deferred per 2026-10-08 scope decision —
+// it is NOT offered for new requests, estimates, or jobs.
+export const ACTIVE_SERVICES = [
   { key: 'security_film', label: 'Security Film', detail: 'High-impact shatter film and installation' },
   { key: 'locksmith', label: 'Locksmith', detail: 'Rekey and lock change · no cars or key fobs' },
-  { key: 'windows', label: 'Windows', detail: 'Glass replacement' },
   { key: 'doors', label: 'Doors', detail: 'Repair or replacement' },
-  { key: 'skincare', label: 'Skincare', detail: 'Skincare service call' },
+  { key: 'skincare', label: 'Skincare', detail: 'Red light therapy devices only' },
+] as const;
+// Full service list INCLUDING deferred/historical services.
+// Use ONLY for resolving historical records (serviceLabel, technician matching, photo checklists).
+// NEVER use for new-job pickers — use ACTIVE_SERVICES instead.
+export const SERVICES = [
+  ...ACTIVE_SERVICES,
+  { key: 'windows', label: 'Windows', detail: 'Glass replacement (deferred — historical records only)' },
 ] as const;
 export type Service = typeof SERVICES[number]['label'];
 export function serviceLabel(value: string): Service {

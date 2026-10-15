@@ -58,7 +58,6 @@ const STEP_TITLES = [
 const SERVICE_KEYS: { key: string; display: string }[] = [
   { key: 'locksmith', display: 'Locksmith' },
   { key: 'security_film', display: 'Security Window Film' },
-  { key: 'windows', display: 'Windows' },
   { key: 'doors', display: 'Doors' },
   { key: 'skincare', display: 'Skincare' },
 ];

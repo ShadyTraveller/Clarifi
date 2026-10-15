@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { supabase } from './lib_supabase';
 import { AsyncButton, Modal, money } from './ui';
 import Markdown from './Markdown';
-import { SERVICES, serviceLabel, squareFeet, totals, requestMarkdown, type RequestDraft, type EstimateDraft, type EstimateLine, type Service, type Product } from './lib/domain';
+import { ACTIVE_SERVICES, serviceLabel, squareFeet, totals, requestMarkdown, type RequestDraft, type EstimateDraft, type EstimateLine, type Service, type Product } from './lib/domain';
 
 export async function assistant(body: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
@@ -18,7 +18,7 @@ export async function readPhoto(file: File): Promise<string> {
   return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Could not read the photo.')); reader.readAsDataURL(file); });
 }
 function ServicePicker({ value, onChange }: { value: Service; onChange: (value: Service) => void }) {
-  return <label>Service<select value={value} onChange={e => onChange(e.target.value as Service)}>{SERVICES.map(s => <option key={s.key}>{s.label}</option>)}</select></label>;
+  return <label>Service<select value={value} onChange={e => onChange(e.target.value as Service)}>{ACTIVE_SERVICES.map(s => <option key={s.key}>{s.label}</option>)}</select></label>;
 }
 export function RequestComposer({ orgId, techs, onClose, onSaved }: { orgId: string; techs: any[]; onClose: () => void; onSaved: (id: string) => Promise<void> }) {
   const [service, setService] = useState<Service>('Locksmith'), [text, setText] = useState(''), [draft, setDraft] = useState<RequestDraft | null>(null);

@@ -19,9 +19,8 @@ const DispatchMap = dynamic(() => import('./DispatchMap'), { ssr: false, loading
 const SERVICES=[
  {key:'security_film',label:'Security Film',detail:'High-impact shatter film per square foot, installation solution'},
  {key:'locksmith',label:'Locksmith',detail:'Rekey, lock change'},
- {key:'windows',label:'Windows',detail:'Replacement'},
  {key:'doors',label:'Doors',detail:'Repair or replacement'},
- {key:'skincare',label:'Skincare',detail:'Skincare service call'},
+ {key:'skincare',label:'Skincare',detail:'Red light therapy devices only'},
 ];
 const serviceLabel=(key:string)=>displayService(key);
 
