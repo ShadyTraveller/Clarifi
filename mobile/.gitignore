@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+android/
+ios/
+artifacts/
+
+# Local EAS signing material
+credentials.json
+*.jks
+*.keystore
