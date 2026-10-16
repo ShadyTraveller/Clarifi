@@ -26,6 +26,13 @@
         "image": "latest",
         "buildType": "app-bundle"
       }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
     }
+  },
+  "submit": {
+    "production": {}
   }
 }

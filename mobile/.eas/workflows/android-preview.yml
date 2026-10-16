@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - mobile
+      - codex/mobile-dispatch-dashboard
   workflow_dispatch: {}
 
 jobs:

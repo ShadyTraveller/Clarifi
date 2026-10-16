@@ -9,7 +9,8 @@ from `mobile/`, not the Next.js repository root. Apple is excluded for now.
 - `npm run build:workflow`: manually run the preview workflow.
 - `npm run build:workflow:production`: manually run Create Production Builds.
 
-`.eas/workflows/android-preview.yml` builds preview APKs on pushes to `mobile`.
+`.eas/workflows/android-preview.yml` builds preview APKs on pushes to `mobile`
+and `codex/mobile-dispatch-dashboard`.
 `.eas/workflows/create-production-builds.yml` is manual and builds Android only.
 Neither workflow submits to a store. Each build runs type checks and unit tests
 in the EAS post-install hook. Public Supabase configuration is in eas.json;
@@ -17,8 +18,9 @@ private test passwords, server credentials and signing keys must not be added.
 
 ## Link the existing Expo project once
 
-Obtain the actual project URL/UUID and owner from the user's existing expo.dev
-project. Authenticate via `eas login` locally or an `EXPO_TOKEN` supplied through
+The remote app.json links the existing project UUID
+`9bcb457a-2108-421a-b407-3eed6c932d94`. Preserve this identity; confirm its
+owner/slug using an authenticated Expo session. Authenticate via `eas login` locally or an `EXPO_TOKEN` supplied through
 secure environment settings. Never paste a token into chat or commit it.
 Run `npx eas-cli@25.0.0 init --id <existing-project-uuid>` from mobile and review
 app.json's owner/slug/extra.eas.projectId against that project. Do not create a
@@ -35,12 +37,17 @@ a preview build through the workflow after local checks.
 The Android build submission and Expo workflow validation commands were attempted
 but stopped because this workspace is not logged into Expo. No build was queued.
 Local EAS JSON schema/profile validation, YAML parsing, Expo config resolution,
-TypeScript and unit checks passed. The existing Expo project UUID/owner is still
-needed to link app.json; server-side workflow validation remains pending login.
+TypeScript and unit checks passed. The existing project UUID is now linked in app.json by the user’s remote commit;
+server-side workflow validation and account/slug verification remain pending login.
 
 At inspection, remote `mobile` contains the contract but not the Expo app. The
 app and this configuration are in draft PR #1 targeting mobile. The user's review
 before merge remains required. Automatic mobile-branch builds become applicable
-once the app/configuration are merged and the Expo project is linked. Until then,
-authenticated CLI builds can use the review branch. Do not claim the workflow is
+once the app/configuration are merged. The preview workflow also listens to the
+review branch, allowing the linked Expo GitHub App to build it without merging.
+The Expo GitHub Base directory must be mobile; the integration must report a
+workflow/build before a push can be called a successful submission. Do not claim the workflow is
 active or that an install link exists until Expo confirms the build.
+
+The pre-existing development profile is preserved; it is not used by these workflows.
+A development-client build requires expo-dev-client setup before use.
