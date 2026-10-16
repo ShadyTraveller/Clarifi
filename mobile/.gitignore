@@ -9,3 +9,8 @@ web-build/
 android/
 ios/
 artifacts/
+
+# Local EAS signing material
+credentials.json
+*.jks
+*.keystore

@@ -38,7 +38,12 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "export:android": "expo export --platform android",
     "export:web": "expo export --platform web",
-    "start:tunnel": "expo start --tunnel --clear"
+    "start:tunnel": "expo start --tunnel --clear",
+    "build:preview": "npx eas-cli@25.0.0 build --platform android --profile preview",
+    "build:production": "npx eas-cli@25.0.0 build --platform android --profile production",
+    "build:workflow": "npx eas-cli@25.0.0 workflow:run .eas/workflows/android-preview.yml",
+    "eas-build-post-install": "npm run check && npm test",
+    "build:workflow:production": "npx eas-cli@25.0.0 workflow:run .eas/workflows/create-production-builds.yml"
   },
   "private": true,
   "type": "module"
