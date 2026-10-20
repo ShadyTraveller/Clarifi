@@ -279,3 +279,17 @@ create policy "members can read customer updates"
 
 comment on table public.customer_updates is
   'Customer-facing comms lifecycle. sent≠delivered≠confirmed. Office notifications table is internal-only and never counts as customer contact.';
+
+-- ============================================================
+-- Supabase "final notice" (email Oct 20, 2026): from Oct 30, 2026 new
+-- tables in public no longer receive automatic Data API grants.
+-- These explicit grants keep the four new tables reachable through
+-- PostgREST / supabase-js. The row-level policies above still
+-- enforce who can actually read or write rows. GRANT is
+-- idempotent: safe whether this migration runs before or after
+-- Oct 30, and safe to re-run.
+-- ============================================================
+grant select, insert, update, delete on public.job_notes to anon, authenticated, service_role;
+grant select, insert, update, delete on public.job_note_reads to anon, authenticated, service_role;
+grant select, insert, update, delete on public.warehouse_receipts to anon, authenticated, service_role;
+grant select, insert, update, delete on public.customer_updates to anon, authenticated, service_role;

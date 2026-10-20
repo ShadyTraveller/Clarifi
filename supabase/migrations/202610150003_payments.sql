@@ -69,3 +69,11 @@ comment on table public.payments is
 --   sent → overdue (past due_at, unpaid)
 comment on column public.invoices.status is
   'Lifecycle: draft (office-only) → sent → paid. Also: voided, overdue. Only the office sends invoices; clients never see drafts.';
+
+-- ============================================================
+-- Supabase Oct 30, 2026 change: new tables in public no longer get
+-- automatic Data API grants (see note at the end of migration
+-- 202610110001). Same explicit-grant treatment here; the RLS
+-- policies above still enforce row-level access. Idempotent.
+-- ============================================================
+grant select, insert, update, delete on public.payments to anon, authenticated, service_role;
