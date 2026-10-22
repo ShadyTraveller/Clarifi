@@ -230,8 +230,8 @@ grant execute on function public.assign_job(uuid, uuid, timestamptz, timestamptz
 revoke execute on function public.job_timeline(uuid) from public, anon;
 grant execute on function public.job_timeline(uuid) to authenticated, service_role;
 
-revoke execute on function public.triage_request(uuid, text, text, timestamptz) from public, anon;
-grant execute on function public.triage_request(uuid, text, text, timestamptz) to authenticated, service_role;
+revoke execute on function public.triage_request(uuid, text, text, text, timestamptz) from public, anon;
+grant execute on function public.triage_request(uuid, text, text, text, timestamptz) to authenticated, service_role;
 
 comment on function public.create_clarifi_request(uuid, jsonb, jsonb, text) is
   'Hardened intake: anonymous callers rejected in-body and at grant level (PUBLIC/anon revoked 2026-10-21); office-auth, dedupe, blank-only updates, idempotent via source_ref.';
