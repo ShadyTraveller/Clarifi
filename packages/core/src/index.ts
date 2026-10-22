@@ -37,6 +37,26 @@ export {
 
 export { buildEstimate, customerProjection, buildAgentEstimateInput } from './estimate';
 
+export type {
+  SectionLineSource,
+  SectionLine,
+  EstimateSection,
+  PricedSectionLine,
+  PricedSection,
+  SectionedEstimateResult,
+  ClientSectionLine,
+  ClientSection,
+  ClientSectionedEstimate,
+} from './sections';
+
+export {
+  laborUnitFromTier,
+  priceSectionLine,
+  priceSection,
+  priceSectionedEstimate,
+  sectionCustomerProjection,
+} from './sections';
+
 export {
   isOutOfScope,
   hasExtension,
