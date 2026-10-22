@@ -1,0 +1,36 @@
+# Yavamo Codex development subagents. Add future agents under [agents.<name>].
+[features]
+multi_agent = true
+
+[agents.client_entry]
+description = "client entry specialist for Yavamo"
+config_file = "agents/client-entry.toml"
+
+[agents.request_triage]
+description = "request triage specialist for Yavamo"
+config_file = "agents/request-triage.toml"
+
+[agents.estimate_generator]
+description = "estimate generator specialist for Yavamo"
+config_file = "agents/estimate-generator.toml"
+
+[agents.scheduling_dispatch]
+description = "scheduling dispatch specialist for Yavamo"
+config_file = "agents/scheduling-dispatch.toml"
+
+[agents.invoicing]
+description = "invoicing specialist for Yavamo"
+config_file = "agents/invoicing.toml"
+
+[agents.financial_analyst]
+description = "financial analyst specialist for Yavamo"
+config_file = "agents/financial-analyst.toml"
+
+# Primary coordinators; existing specialist roles remain available.
+[agents.lead_dispatch]
+description = "GTA email/Facebook lead intake, estimate/job triage, scheduling and technician assignment"
+config_file = "agents/lead-dispatch.toml"
+
+[agents.estimate_invoice]
+description = "Prepare office-reviewed Yavamo estimates and invoices from verified scope and work"
+config_file = "agents/estimate-invoice.toml"
